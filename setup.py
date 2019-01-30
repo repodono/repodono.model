@@ -36,6 +36,7 @@ setup(
     install_requires=[
         'setuptools',
         # -*- Extra requirements: -*-
+        'toml',
     ],
     extras_require={
     },

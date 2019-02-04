@@ -1,4 +1,7 @@
-from collections import MutableMapping
+from collections import (
+    Sequence,
+    MutableMapping,
+)
 
 
 class BaseMapping(MutableMapping):
@@ -94,3 +97,35 @@ class FlatGroupedMapping(BaseMapping):
 
     def __repr__(self):
         return repr(self.__combined())
+
+
+def structured_mapper(definition_pairs, input_mapping):
+    """
+    Produce a list of some mapping based on input definition pairs.
+
+    Arguments:
+
+    definition_pairs
+        This is in the form of a 2-tuple of key, value, the key being
+        the key to extract the actual values from the input_mapping,
+        the value being the class to map the values provided at the key
+        from the input_mapping, or another nested 2-tuple for a
+        recursively generated flattened group mapping.
+    input_mapping
+        The raw input map (dict)
+    """
+
+    def _mapper(definition_pairs, input_mapping, _maps=NotImplemented):
+        maps = [] if _maps is NotImplemented else _maps
+        for key, value in definition_pairs:
+            if key not in input_mapping:
+                continue
+            if isinstance(value, Sequence):
+                _mapper(value, input_mapping[key], _maps=maps)
+            else:
+                # XXX assuming value to be a class
+                maps.append(value(input_mapping[key]))
+
+        return maps
+
+    return _mapper(definition_pairs, input_mapping)

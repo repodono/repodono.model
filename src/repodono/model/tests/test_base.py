@@ -1,8 +1,11 @@
 import unittest
 from ast import literal_eval
 
-from repodono.model.base import BaseMapping
-from repodono.model.base import FlatGroupedMapping
+from repodono.model.base import (
+    BaseMapping,
+    FlatGroupedMapping,
+    structured_mapper,
+)
 
 
 class BaseMappingTestCase(unittest.TestCase):
@@ -112,6 +115,48 @@ class FlatGroupedMappingTestCase(unittest.TestCase):
             },
             literal_eval(str(mapping)),
         )
+        self.assertEqual(
+            ['abc', 'custom', 'def', 'ghi'],
+            sorted(iter(mapping)),
+        )
+        self.assertIn('custom', mapping)
+        self.assertEqual(4, len(mapping))
 
         del mapping['custom']
         self.assertNotIn('custom', mapping)
+        self.assertEqual(3, len(mapping))
+
+
+class StructureMapperTestCase(unittest.TestCase):
+
+    def test_creation(self):
+        definition = (
+            ('root', (
+                ('child1', BaseMapping),
+                ('child2', BaseMapping),
+            ),),
+        )
+        raw_mapping = {
+            'root': {
+                'child1': {
+                    'key1': 'child1.1',
+                    'key2': 'child1.2',
+                },
+                'child2': {
+                    'key2': 'child2.2',
+                    'key3': 'child2.3',
+                },
+            },
+        }
+        mappings = structured_mapper(definition, raw_mapping)
+        self.assertEqual(2, len(mappings))
+        self.assertTrue(isinstance(mappings[0], BaseMapping))
+        self.assertTrue(isinstance(mappings[1], BaseMapping))
+        self.assertEqual(mappings[0], {
+            'key1': 'child1.1',
+            'key2': 'child1.2',
+        })
+        self.assertEqual(mappings[1], {
+            'key2': 'child2.2',
+            'key3': 'child2.3',
+        })

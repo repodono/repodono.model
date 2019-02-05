@@ -5,6 +5,8 @@ from collections import (
     MutableMapping,
 )
 
+from pkg_resources import EntryPoint
+
 
 class BaseMapping(MutableMapping):
 
@@ -107,6 +109,33 @@ class PathMapping(BaseMapping):
         super().__setitem__(key, Path(value))
 
 
+class ObjectInstantiationMapping(BaseMapping):
+    """
+    This takes a list of dicts that contain the prerequisite keys and
+    values and it will invoke the target constructor or function as
+    specified.
+    """
+
+    # XXX determine if name should be vars_ or _vars
+
+    def __init__(self, items, _vars):
+        """
+        For a given mapping resolve the object and construct a mapping
+        """
+
+        super().__init__()
+
+        for item in items:
+            # XXX TODO refactor this into a function
+            # name = assignment
+            name = item.pop('__name__')
+            entry = EntryPoint.parse('target=' + item.pop('__init__'))
+            target = entry.resolve()
+            kwargs = {key: _vars[value] for key, value in item.items()}
+            object_ = target(**kwargs)
+            self.__setitem__(name, object_)
+
+
 def StructuredMapping(definition):
     """
     A class factory for the creation of a parent class that can
@@ -117,8 +146,11 @@ def StructuredMapping(definition):
     class StructuredMapping(FlatGroupedMapping):
 
         def __init__(self, raw_mapping):
-            mappings = structured_mapper(definition, raw_mapping)
+            mappings = []
+            # assign mappings to the private attribute.
             super().__init__(mappings=mappings)
+            structured_mapper(
+                definition, raw_mapping, _maps=mappings, _vars=self)
 
     return StructuredMapping
 

@@ -39,3 +39,19 @@ class EnvironmentTestCase(unittest.TestCase):
         base_environment = Environment(config)
         self.assertEqual(base_environment['foo'], 'bar')
         self.assertTrue(isinstance(base_environment['base_root'], Path))
+
+    def test_objects(self):
+        root = TemporaryDirectory()
+        self.addCleanup(root.cleanup)
+        config = Configuration("""
+        [environment.variables]
+        foo = "bar"
+        [environment.paths]
+        base_root = "%s"
+        [[environment.objects]]
+        __name__ = "thing"
+        __init__ = "repodono.model.testing:Thing"
+        path = "base_root"
+        """ % (root.name,))
+        base_environment = Environment(config)
+        self.assertTrue(isinstance(base_environment['thing'].path, Path))

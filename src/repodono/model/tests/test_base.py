@@ -5,6 +5,7 @@ from repodono.model.base import (
     BaseMapping,
     FlatGroupedMapping,
     structured_mapper,
+    StructuredMapping,
 )
 
 
@@ -127,7 +128,7 @@ class FlatGroupedMappingTestCase(unittest.TestCase):
         self.assertEqual(3, len(mapping))
 
 
-class StructureMapperTestCase(unittest.TestCase):
+class StructuredMapperTestCase(unittest.TestCase):
 
     def test_creation(self):
         definition = (
@@ -160,3 +161,62 @@ class StructureMapperTestCase(unittest.TestCase):
             'key2': 'child2.2',
             'key3': 'child2.3',
         })
+
+    def test_creation_special_vars(self):
+        class WithoutVars(BaseMapping):
+            def __init__(self, *a, **kw):
+                self._vars = NotImplemented
+
+        class WithVars(BaseMapping):
+            def __init__(self, *a, _vars=None, **kw):
+                self._vars = _vars
+
+        definition = (
+            ('root', (
+                ('without_vars', WithoutVars),
+                ('with_vars', WithVars),
+            ),),
+        )
+        raw_mapping = {
+            'root': {
+                'without_vars': {
+                    'key1': 'value1',
+                },
+                'with_vars': {
+                    'key2': 'value2',
+                },
+            },
+        }
+        vars_ = {}
+        mappings = structured_mapper(definition, raw_mapping, _vars=vars_)
+        self.assertEqual(2, len(mappings))
+        self.assertTrue(isinstance(mappings[0], WithoutVars))
+        self.assertTrue(isinstance(mappings[1], WithVars))
+        self.assertIs(mappings[1]._vars, vars_)
+
+
+class StructuredMappingTestCase(unittest.TestCase):
+
+    def test_creation_basic(self):
+        cls = StructuredMapping((
+            ('root', (
+                ('child1', BaseMapping),
+                ('child2', BaseMapping),
+            ),),
+        ))
+        mapping = cls({
+            'root': {
+                'child1': {
+                    'key1': 'child1.1',
+                    'key2': 'child1.2',
+                },
+                'child2': {
+                    'key2': 'child2.2',
+                    'key3': 'child2.3',
+                },
+            },
+        })
+        self.assertEqual(3, len(mapping))
+        self.assertEqual(mapping['key1'], 'child1.1')
+        self.assertEqual(mapping['key2'], 'child1.2')
+        self.assertEqual(mapping['key3'], 'child2.3')

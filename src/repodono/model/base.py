@@ -1,3 +1,4 @@
+from inspect import signature
 from pathlib import Path
 from collections import (
     Sequence,
@@ -122,7 +123,8 @@ def StructuredMapping(definition):
     return StructuredMapping
 
 
-def structured_mapper(definition_pairs, input_mapping):
+def structured_mapper(
+        definition_pairs, input_mapping, _maps=NotImplemented, _vars=None):
     """
     Produce a list of some mapping based on input definition pairs.
 
@@ -145,10 +147,14 @@ def structured_mapper(definition_pairs, input_mapping):
                 continue
             if isinstance(value, Sequence):
                 _mapper(value, input_mapping[key], _maps=maps)
+                continue
+            # XXX assuming value to be a class
+            sig = signature(value)
+            if '_vars' in sig.parameters:
+                maps.append(value(input_mapping[key], _vars=_vars))
             else:
-                # XXX assuming value to be a class
                 maps.append(value(input_mapping[key]))
 
         return maps
 
-    return _mapper(definition_pairs, input_mapping)
+    return _mapper(definition_pairs, input_mapping, _maps)

@@ -1,3 +1,4 @@
+from pathlib import Path
 from collections import (
     Sequence,
     MutableMapping,
@@ -97,6 +98,28 @@ class FlatGroupedMapping(BaseMapping):
 
     def __repr__(self):
         return repr(self.__combined())
+
+
+class PathMapping(BaseMapping):
+
+    def __setitem__(self, key, value):
+        super().__setitem__(key, Path(value))
+
+
+def StructuredMapping(definition):
+    """
+    A class factory for the creation of a parent class that can
+    encapsulate a predefined structure for creating a flattened group
+    mapping.
+    """
+
+    class StructuredMapping(FlatGroupedMapping):
+
+        def __init__(self, raw_mapping):
+            mappings = structured_mapper(definition, raw_mapping)
+            super().__init__(mappings=mappings)
+
+    return StructuredMapping
 
 
 def structured_mapper(definition_pairs, input_mapping):

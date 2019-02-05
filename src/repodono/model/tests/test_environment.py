@@ -1,4 +1,6 @@
 import unittest
+from pathlib import Path
+from tempfile import TemporaryDirectory
 
 from repodono.model.config import Configuration
 from repodono.model.environment import Environment
@@ -25,5 +27,15 @@ class EnvironmentTestCase(unittest.TestCase):
         base_environment = Environment(config)
         self.assertEqual(base_environment['foo'], 'bar')
 
-    # def test_environment(self):
-    #     env = Environment()
+    def test_paths(self):
+        root = TemporaryDirectory()
+        self.addCleanup(root.cleanup)
+        config = Configuration("""
+        [environment.variables]
+        foo = "bar"
+        [environment.paths]
+        base_root = "%s"
+        """ % (root.name,))
+        base_environment = Environment(config)
+        self.assertEqual(base_environment['foo'], 'bar')
+        self.assertTrue(isinstance(base_environment['base_root'], Path))

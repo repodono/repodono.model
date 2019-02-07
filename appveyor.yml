@@ -1,0 +1,22 @@
+environment:
+  matrix:
+    - PYTHON: "C:\\Python36"
+    - PYTHON: "C:\\Python37"
+
+install:
+  - "SET PATH=%PYTHON%;%PYTHON%\\Scripts;%PATH%"
+  - "%PYTHON%\\python.exe -m virtualenv env"
+  - "env\\Scripts\\activate"
+  - "pip install -U coverage"
+  - "pip install -e ."
+
+test_script:
+  # piping empty echo to disable the tty test which is reported as
+  # working but actually non-working on appveyor.
+  - "coverage run --include=src/* -m unittest repodono.model.tests.make_suite"
+  - "coverage report -m"
+
+artifacts:
+  - path: dist\*
+
+build: off

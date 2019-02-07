@@ -6,7 +6,6 @@ classifiers = """
 Development Status :: 3 - Alpha
 License :: OSI Approved :: GNU General Public License v2 or later (GPLv2+)
 Operating System :: OS Independent
-Programming Language :: JavaScript
 Programming Language :: Python :: 3.6
 Programming Language :: Python :: 3.7
 """.strip().splitlines()

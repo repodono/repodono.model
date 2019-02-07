@@ -125,13 +125,28 @@ class ObjectInstantiationMapping(BaseMapping):
 
         super().__init__()
 
+        def map_vars_value(value):
+            # these are assumed to be produced by the toml/json loads,
+            # which should only produce instances of list/dict for the
+            # structured data types.
+            if isinstance(value, list):
+                return [map_vars_value(key) for key in value]
+            elif isinstance(value, dict):
+                return {
+                    name: map_vars_value(key) for name, key in value.items()}
+            else:
+                return _vars[value]
+
         for item in items:
             # XXX TODO refactor this into a function
             # name = assignment
             name = item.pop('__name__')
             entry = EntryPoint.parse('target=' + item.pop('__init__'))
             target = entry.resolve()
-            kwargs = {key: _vars[value] for key, value in item.items()}
+            kwargs = {
+                key: map_vars_value(value)
+                for key, value in item.items()
+            }
             object_ = target(**kwargs)
             self.__setitem__(name, object_)
 

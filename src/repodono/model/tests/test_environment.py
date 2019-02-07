@@ -34,7 +34,7 @@ class EnvironmentTestCase(unittest.TestCase):
         [environment.variables]
         foo = "bar"
         [environment.paths]
-        base_root = "%s"
+        base_root = %r
         """ % (root.name,))
         base_environment = Environment(config)
         self.assertEqual(base_environment['foo'], 'bar')
@@ -47,7 +47,7 @@ class EnvironmentTestCase(unittest.TestCase):
         [environment.variables]
         foo = "bar"
         [environment.paths]
-        base_root = "%s"
+        base_root = %r
         [[environment.objects]]
         __name__ = "thing"
         __init__ = "repodono.model.testing:Thing"

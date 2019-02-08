@@ -8,6 +8,56 @@ from collections import (
 from pkg_resources import EntryPoint
 
 
+def map_vars_value(value, vars_):
+    # these are assumed to be produced by the toml/json loads,
+    # which should only produce instances of list/dict for the
+    # structured data types.
+    if isinstance(value, list):
+        return [map_vars_value(key, vars_) for key in value]
+    elif isinstance(value, dict):
+        return {
+            name: map_vars_value(key, vars_) for name, key in value.items()}
+    else:
+        return vars_[value]
+
+
+def structured_mapper(
+        definition_pairs, input_mapping, _maps=NotImplemented, vars_=None):
+    """
+    Produce a list of some mapping based on input definition pairs.
+
+    Arguments:
+
+    definition_pairs
+        This is in the form of a 2-tuple of key, value, the key being
+        the key to extract the actual values from the input_mapping,
+        the value being the class to map the values provided at the key
+        from the input_mapping, or another nested 2-tuple for a
+        recursively generated flattened group mapping.
+    input_mapping
+        The raw input map (dict)
+    """
+
+    def _mapper(definition_pairs, input_mapping, _maps=NotImplemented):
+        maps = [] if _maps is NotImplemented else _maps
+        for key, value in definition_pairs:
+            if key not in input_mapping:
+                continue
+            if isinstance(value, Sequence):
+                _mapper(value, input_mapping[key], _maps=maps)
+                continue
+            # XXX assuming value to be a class
+            sig = signature(value)
+            if 'vars_' in sig.parameters:
+                maps.append(value(input_mapping[key], vars_=vars_))
+            else:
+                maps.append(value(input_mapping[key]))
+
+        return maps
+
+    return _mapper(definition_pairs, input_mapping, _maps)
+
+
 class BaseMapping(MutableMapping):
 
     def __init__(self, *a, **kw):
@@ -116,26 +166,15 @@ class ObjectInstantiationMapping(BaseMapping):
     specified.
     """
 
-    # XXX determine if name should be vars_ or _vars
+    # currently defining vars_ as a parameter as the current
+    # StructuredMapping resolves that signature.
 
-    def __init__(self, items, _vars):
+    def __init__(self, items, vars_):
         """
         For a given mapping resolve the object and construct a mapping
         """
 
         super().__init__()
-
-        def map_vars_value(value):
-            # these are assumed to be produced by the toml/json loads,
-            # which should only produce instances of list/dict for the
-            # structured data types.
-            if isinstance(value, list):
-                return [map_vars_value(key) for key in value]
-            elif isinstance(value, dict):
-                return {
-                    name: map_vars_value(key) for name, key in value.items()}
-            else:
-                return _vars[value]
 
         for item in items:
             # XXX TODO refactor this into a function
@@ -146,48 +185,11 @@ class ObjectInstantiationMapping(BaseMapping):
             entry = EntryPoint.parse('target=' + kwargs.pop('__init__'))
             target = entry.resolve()
             kwargs = {
-                key: map_vars_value(value)
+                key: map_vars_value(value, vars_=vars_)
                 for key, value in kwargs.items()
             }
             object_ = target(**kwargs)
             self.__setitem__(name, object_)
-
-
-def structured_mapper(
-        definition_pairs, input_mapping, _maps=NotImplemented, _vars=None):
-    """
-    Produce a list of some mapping based on input definition pairs.
-
-    Arguments:
-
-    definition_pairs
-        This is in the form of a 2-tuple of key, value, the key being
-        the key to extract the actual values from the input_mapping,
-        the value being the class to map the values provided at the key
-        from the input_mapping, or another nested 2-tuple for a
-        recursively generated flattened group mapping.
-    input_mapping
-        The raw input map (dict)
-    """
-
-    def _mapper(definition_pairs, input_mapping, _maps=NotImplemented):
-        maps = [] if _maps is NotImplemented else _maps
-        for key, value in definition_pairs:
-            if key not in input_mapping:
-                continue
-            if isinstance(value, Sequence):
-                _mapper(value, input_mapping[key], _maps=maps)
-                continue
-            # XXX assuming value to be a class
-            sig = signature(value)
-            if '_vars' in sig.parameters:
-                maps.append(value(input_mapping[key], _vars=_vars))
-            else:
-                maps.append(value(input_mapping[key]))
-
-        return maps
-
-    return _mapper(definition_pairs, input_mapping, _maps)
 
 
 def StructuredMapping(definition, structured_mapper=structured_mapper):
@@ -204,6 +206,6 @@ def StructuredMapping(definition, structured_mapper=structured_mapper):
             # assign mappings to the private attribute.
             super().__init__(mappings=mappings)
             structured_mapper(
-                definition, raw_mapping, _maps=mappings, _vars=self)
+                definition, raw_mapping, _maps=mappings, vars_=self)
 
     return StructuredMapping

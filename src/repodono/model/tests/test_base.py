@@ -166,11 +166,11 @@ class StructuredMapperTestCase(unittest.TestCase):
     def test_creation_special_vars(self):
         class WithoutVars(BaseMapping):
             def __init__(self, *a, **kw):
-                self._vars = NotImplemented
+                self.vars = NotImplemented
 
         class WithVars(BaseMapping):
-            def __init__(self, *a, _vars=None, **kw):
-                self._vars = _vars
+            def __init__(self, *a, vars_=None, **kw):
+                self.vars = vars_
 
         definition = (
             ('root', (
@@ -189,11 +189,11 @@ class StructuredMapperTestCase(unittest.TestCase):
             },
         }
         vars_ = {}
-        mappings = structured_mapper(definition, raw_mapping, _vars=vars_)
+        mappings = structured_mapper(definition, raw_mapping, vars_=vars_)
         self.assertEqual(2, len(mappings))
         self.assertTrue(isinstance(mappings[0], WithoutVars))
         self.assertTrue(isinstance(mappings[1], WithVars))
-        self.assertIs(mappings[1]._vars, vars_)
+        self.assertIs(mappings[1].vars, vars_)
 
 
 class StructuredMappingTestCase(unittest.TestCase):

@@ -153,25 +153,6 @@ class ObjectInstantiationMapping(BaseMapping):
             self.__setitem__(name, object_)
 
 
-def StructuredMapping(definition):
-    """
-    A class factory for the creation of a parent class that can
-    encapsulate a predefined structure for creating a flattened group
-    mapping.
-    """
-
-    class StructuredMapping(FlatGroupedMapping):
-
-        def __init__(self, raw_mapping):
-            mappings = []
-            # assign mappings to the private attribute.
-            super().__init__(mappings=mappings)
-            structured_mapper(
-                definition, raw_mapping, _maps=mappings, _vars=self)
-
-    return StructuredMapping
-
-
 def structured_mapper(
         definition_pairs, input_mapping, _maps=NotImplemented, _vars=None):
     """
@@ -207,3 +188,22 @@ def structured_mapper(
         return maps
 
     return _mapper(definition_pairs, input_mapping, _maps)
+
+
+def StructuredMapping(definition, structured_mapper=structured_mapper):
+    """
+    A class factory for the creation of a parent class that can
+    encapsulate a predefined structure for creating a flattened group
+    mapping.
+    """
+
+    class StructuredMapping(FlatGroupedMapping):
+
+        def __init__(self, raw_mapping):
+            mappings = []
+            # assign mappings to the private attribute.
+            super().__init__(mappings=mappings)
+            structured_mapper(
+                definition, raw_mapping, _maps=mappings, _vars=self)
+
+    return StructuredMapping

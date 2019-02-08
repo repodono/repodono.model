@@ -140,12 +140,14 @@ class ObjectInstantiationMapping(BaseMapping):
         for item in items:
             # XXX TODO refactor this into a function
             # name = assignment
-            name = item.pop('__name__')
-            entry = EntryPoint.parse('target=' + item.pop('__init__'))
+            kwargs = {}
+            kwargs.update(item)
+            name = kwargs.pop('__name__')
+            entry = EntryPoint.parse('target=' + kwargs.pop('__init__'))
             target = entry.resolve()
             kwargs = {
                 key: map_vars_value(value)
-                for key, value in item.items()
+                for key, value in kwargs.items()
             }
             object_ = target(**kwargs)
             self.__setitem__(name, object_)

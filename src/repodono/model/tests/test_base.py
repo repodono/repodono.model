@@ -4,6 +4,7 @@ from ast import literal_eval
 from repodono.model.base import (
     BaseMapping,
     FlatGroupedMapping,
+    ObjectInstantiationMapping,
     structured_mapper,
     StructuredMapping,
 )
@@ -220,3 +221,23 @@ class StructuredMappingTestCase(unittest.TestCase):
         self.assertEqual(mapping['key1'], 'child1.1')
         self.assertEqual(mapping['key2'], 'child1.2')
         self.assertEqual(mapping['key3'], 'child2.3')
+
+
+class ObjectInstantiationMappingTestCase(unittest.TestCase):
+
+    def test_stability(self):
+        value = [{
+            '__name__': 'thing',
+            '__init__': 'repodono.model.testing:Thing',
+            'path': 'a_path',
+        }]
+        marker = object()
+        vars_ = {'a_path': marker}
+        result = ObjectInstantiationMapping(value, vars_)
+        self.assertEqual({'a_path': marker}, vars_)
+        self.assertEqual([{
+            '__name__': 'thing',
+            '__init__': 'repodono.model.testing:Thing',
+            'path': 'a_path',
+        }], value)
+        self.assertEqual(result['thing'].path, marker)

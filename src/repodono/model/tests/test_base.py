@@ -5,9 +5,11 @@ from repodono.model.base import (
     BaseMapping,
     FlatGroupedMapping,
     ObjectInstantiationMapping,
+    ResourceDefinitionMapping,
     structured_mapper,
     StructuredMapping,
 )
+from repodono.model.testing import Thing
 
 
 class BaseMappingTestCase(unittest.TestCase):
@@ -240,4 +242,66 @@ class ObjectInstantiationMappingTestCase(unittest.TestCase):
             '__init__': 'repodono.model.testing:Thing',
             'path': 'a_path',
         }], value)
+        self.assertTrue(isinstance(result['thing'], Thing))
         self.assertEqual(result['thing'].path, marker)
+
+
+class ResourceDefinitionMappingTestCase(unittest.TestCase):
+
+    def test_invalid_call_and_init(self):
+        # TODO validate exception message.
+        with self.assertRaises(ValueError):
+            ResourceDefinitionMapping({
+                '/some/path/{id}': {
+                    '__name__': 'obj',
+                    '__call__': 'a_function',
+                    '__init__': 'repodono.model.testing:Thing',
+                }
+            })
+
+        with self.assertRaises(ValueError):
+            ResourceDefinitionMapping({
+                '/some/path/{id}': {
+                    '__name__': 'obj',
+                }
+            })
+
+    def test_name_reference_creation(self):
+        mapping = ResourceDefinitionMapping({
+            '/some/path/{id}': {
+                '__name__': 'obj',
+                '__call__': 'a_function',
+                'arg1': 'reference1',
+            }
+        })
+        marker1 = object()
+        vars_ = {
+            'a_function': Thing(None),
+            'reference1': marker1,
+        }
+        definition = mapping['/some/path/{id}']
+        call = definition(vars_)
+        self.assertTrue(callable(call))
+        result = call()
+        self.assertEqual(((), {'arg1': marker1},), result)
+
+    def test_entrypoint_creation(self):
+        # TODO need to test __init__ that is invalid
+        mapping = ResourceDefinitionMapping({
+            '/some/path/{id}': {
+                '__name__': 'obj',
+                '__init__': 'repodono.model.testing:Thing',
+                'path': 'a_path',
+            }
+        })
+        a_path = object()
+        vars_ = {
+            'a_path': a_path,
+        }
+        definition = mapping['/some/path/{id}']
+        self.assertIs(definition.call, Thing)
+        call = definition(vars_)
+        self.assertTrue(callable(call))
+        result = call()
+        self.assertTrue(isinstance(result, Thing))
+        self.assertIs(result.path, a_path)

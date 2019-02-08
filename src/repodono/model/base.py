@@ -1,4 +1,5 @@
 from inspect import signature
+from functools import partial
 from pathlib import Path
 from collections import (
     Sequence,
@@ -157,6 +158,73 @@ class PathMapping(BaseMapping):
 
     def __setitem__(self, key, value):
         super().__setitem__(key, Path(value))
+
+
+class ResourceDefinitionMapping(BaseMapping):
+
+    class ResourceDefinition(object):
+        def __init__(self, name, call, kwargs):
+            self.name = name
+            self.call = call
+            self.kwargs = kwargs
+
+        @classmethod
+        def from_call(cls, name, call, kwargs):
+            # XXX call must be an indirect call that will load the
+            # actual thing from vars then return call(**kwargs)
+            # FIXME this is currently a placeholder
+            return cls(name=name, call=call, kwargs=kwargs)
+
+        @classmethod
+        def from_entry_point(cls, name, init, kwargs):
+            entry = EntryPoint.parse('target=' + init)
+            call = entry.resolve()
+            return cls(name=name, call=call, kwargs=kwargs)
+
+        # TODO vars_ as an argument determine if sane?
+
+        def __call__(self, vars_, **kwargs):
+            """
+            Prepares a callable object that can be invoked immediately
+            with the required definitions.
+            """
+
+            call = (
+                self.call if callable(self.call) else
+                map_vars_value(self.call, vars_)
+            )
+            kwargs.update(map_vars_value(self.kwargs, vars_))
+            # XXX this does NOT actually trigger the assignment to
+            # vars_[self.name], as the current definition on how the
+            # protocol works is not yet defined; it may be possible to
+            # encapsulate the Environment in a submapping representing
+            # some RuntimeEnvironment for the actual usage.
+            return partial(call, **kwargs)
+
+    def __setitem__(self, key, value):
+        # TODO use the appropriate ResourceDefinition constructor
+        kwargs = {}
+        kwargs.update(value)
+
+        # quick check
+        if ('__call__' in kwargs) == ('__init__' in kwargs):
+            raise ValueError(
+                "only one of '__call__' or '__init__' must be defined.")
+
+        # FIXME figure out how to find duplicate __name__
+        name = kwargs.pop('__name__')
+        # either of the callables.
+        call = kwargs.pop('__call__', None)
+        init = kwargs.pop('__init__', None)
+        if call:
+            value = ResourceDefinitionMapping.ResourceDefinition.from_call(
+                name, call, kwargs)
+        elif init:
+            value = (
+                ResourceDefinitionMapping.ResourceDefinition.from_entry_point(
+                    name, init, kwargs))
+        # FIXME validate key being a valid URL template
+        super().__setitem__(key, value)
 
 
 class ObjectInstantiationMapping(BaseMapping):

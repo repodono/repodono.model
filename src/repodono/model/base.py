@@ -161,6 +161,17 @@ class PathMapping(BaseMapping):
 
 
 class ResourceDefinitionMapping(BaseMapping):
+    """
+    A resource definition mapping is a mapping with keys that reference
+    some path fragment of some URI, and the value assigned being a dict
+    being a mapping of arguments to the function being called, and the
+    function being called be specified with either the __init__ or the
+    __call__ key, plus a __name__ which the return value will be
+    assigned to.  Only one of __init__ or __call__ may be specified;
+    The __init__ key must reference some valid entry point within the
+    environment, while the __call__ key must reference an existing value
+    in the environment that will be invoked.
+    """
 
     class ResourceDefinition(object):
         def __init__(self, name, call, kwargs):
@@ -201,6 +212,16 @@ class ResourceDefinitionMapping(BaseMapping):
             # some RuntimeEnvironment for the actual usage.
             return partial(call, **kwargs)
 
+    @classmethod
+    def create_resource_definition(cls, name, call, init, kwargs):
+        # a naive, generic creation method.
+        if call is not None:
+            return cls.ResourceDefinition.from_call(
+                name, call, kwargs)
+        elif init is not None:
+            return cls.ResourceDefinition.from_entry_point(
+                name, init, kwargs)
+
     def __setitem__(self, key, value):
         # TODO use the appropriate ResourceDefinition constructor
         kwargs = {}
@@ -211,19 +232,17 @@ class ResourceDefinitionMapping(BaseMapping):
             raise ValueError(
                 "only one of '__call__' or '__init__' must be defined.")
 
-        # FIXME figure out how to find duplicate __name__
+        # TODO figure out how to find duplicate __name__, if that is
+        # needed for all implementations.
         name = kwargs.pop('__name__')
         # either of the callables.
         call = kwargs.pop('__call__', None)
         init = kwargs.pop('__init__', None)
-        if call:
-            value = ResourceDefinitionMapping.ResourceDefinition.from_call(
-                name, call, kwargs)
-        elif init:
-            value = (
-                ResourceDefinitionMapping.ResourceDefinition.from_entry_point(
-                    name, init, kwargs))
+        value = self.create_resource_definition(name, call, init, kwargs)
+
         # FIXME validate key being a valid URL template
+        # FIXME this needs to be co-ordinated with the endpoint mapping
+        # implementation.
         super().__setitem__(key, value)
 
 
@@ -232,6 +251,16 @@ class ObjectInstantiationMapping(BaseMapping):
     This takes a list of dicts that contain the prerequisite keys and
     values and it will invoke the target constructor or function as
     specified.
+
+    The reason why this mapping takes a list as part of the construction
+    process is due to the nature of object construction being a sequence
+    of calls that must happen in a specific order, especially given that
+    the constructor may reference previously defined arguments which may
+    become out of order if a mapping is used (as Python<3.6 and the toml
+    spec do not explicitly maintain mapping key/value order).
+
+    This class is also meant ot be used as part of the StructuredMapping
+    class factory.
     """
 
     # currently defining vars_ as a parameter as the current

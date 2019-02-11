@@ -279,7 +279,7 @@ class ResourceDefinitionMappingTestCase(unittest.TestCase):
             'a_function': Thing(None),
             'reference1': marker1,
         }
-        definition = mapping['/some/path/{id}']
+        definition = mapping['/some/path/{id}'][0]
         call = definition(vars_)
         self.assertTrue(callable(call))
         result = call()
@@ -298,10 +298,98 @@ class ResourceDefinitionMappingTestCase(unittest.TestCase):
         vars_ = {
             'a_path': a_path,
         }
-        definition = mapping['/some/path/{id}']
+        definition = mapping['/some/path/{id}'][0]
         self.assertIs(definition.call, Thing)
         call = definition(vars_)
         self.assertTrue(callable(call))
         result = call()
         self.assertTrue(isinstance(result, Thing))
         self.assertIs(result.path, a_path)
+
+    def test_name_reference_creation_multiple_values(self):
+        mapping = ResourceDefinitionMapping({
+            '/some/path/{id}': [{
+                '__name__': 'obj1',
+                '__call__': 'a_function',
+                'arg1': 'reference1',
+            }, {
+                '__name__': 'obj2',
+                '__call__': 'a_function',
+                'arg1': 'reference1',
+            }]
+        })
+        marker1 = object()
+        vars_ = {
+            'a_function': Thing(None),
+            'reference1': marker1,
+        }
+        definition = mapping['/some/path/{id}'][0]
+        call = definition(vars_)
+        self.assertTrue(callable(call))
+        result = call()
+        self.assertEqual(((), {'arg1': marker1},), result)
+        self.assertEqual(definition.name, 'obj1')
+        self.assertEqual(mapping['/some/path/{id}'][1].name, 'obj2')
+
+    def test_entrypoint_creation_multiple_values(self):
+        # TODO need to test __init__ that is invalid
+        mapping = ResourceDefinitionMapping({
+            '/some/path/{id}': [{
+                '__name__': 'obj1',
+                '__init__': 'repodono.model.testing:Thing',
+                'path': 'a_path',
+            }, {
+                '__name__': 'obj2',
+                '__init__': 'repodono.model.testing:Thing',
+                'path': 'a_path',
+            }]
+        })
+        a_path = object()
+        vars_ = {
+            'a_path': a_path,
+        }
+        definition = mapping['/some/path/{id}'][0]
+        self.assertIs(definition.call, Thing)
+        call = definition(vars_)
+        self.assertTrue(callable(call))
+        result = call()
+        self.assertTrue(isinstance(result, Thing))
+        self.assertIs(result.path, a_path)
+
+        self.assertEqual(definition.name, 'obj1')
+        self.assertEqual(mapping['/some/path/{id}'][1].name, 'obj2')
+
+    def test_name_reference_assignment(self):
+        mapping = ResourceDefinitionMapping({
+            '/some/path/{id}': [{
+                '__name__': 'obj1',
+                '__call__': 'a_function',
+                'arg1': 'reference1',
+            }, {
+                '__name__': 'obj2',
+                '__call__': 'a_function',
+                'arg1': 'reference1',
+            }]
+        })
+        # verify existing value
+        self.assertEqual(2, len(mapping['/some/path/{id}']))
+        self.assertEqual(mapping['/some/path/{id}'][0].name, 'obj1')
+        self.assertEqual(mapping['/some/path/{id}'][1].name, 'obj2')
+
+        # naive assignment function as append (non-standard)
+        mapping['/some/path/{id}'] = {
+            '__name__': 'obj3',
+            '__call__': 'a_function',
+            'arg1': 'reference1',
+        }
+        self.assertEqual(3, len(mapping['/some/path/{id}']))
+        self.assertEqual(mapping['/some/path/{id}'][2].name, 'obj3')
+
+        # assignment of a new list will reset
+        mapping['/some/path/{id}'] = [{
+            '__name__': 'obj3',
+            '__call__': 'a_function',
+            'arg1': 'reference1',
+        }]
+        self.assertEqual(1, len(mapping['/some/path/{id}']))
+        self.assertEqual(mapping['/some/path/{id}'][0].name, 'obj3')

@@ -171,6 +171,10 @@ class ResourceDefinitionMapping(BaseMapping):
     The __init__ key must reference some valid entry point within the
     environment, while the __call__ key must reference an existing value
     in the environment that will be invoked.
+
+    Another notable difference with this mapping is that each key must
+    have multiple values presented in an ordered list, as there can be
+    multiple resources defined for each end point.
     """
 
     class ResourceDefinition(object):
@@ -222,10 +226,10 @@ class ResourceDefinitionMapping(BaseMapping):
             return cls.ResourceDefinition.from_entry_point(
                 name, init, kwargs)
 
-    def __setitem__(self, key, value):
-        # TODO use the appropriate ResourceDefinition constructor
+    @classmethod
+    def prepare_resource_definition(cls, item):
         kwargs = {}
-        kwargs.update(value)
+        kwargs.update(item)
 
         # quick check
         if ('__call__' in kwargs) == ('__init__' in kwargs):
@@ -238,12 +242,25 @@ class ResourceDefinitionMapping(BaseMapping):
         # either of the callables.
         call = kwargs.pop('__call__', None)
         init = kwargs.pop('__init__', None)
-        value = self.create_resource_definition(name, call, init, kwargs)
+        return cls.create_resource_definition(name, call, init, kwargs)
 
+    def __setitem__(self, key, value):
         # FIXME validate key being a valid URL template
         # FIXME this needs to be co-ordinated with the endpoint mapping
         # implementation.
-        super().__setitem__(key, value)
+        if key not in self:
+            result = []
+            super().__setitem__(key, result)
+        else:
+            result = self.get(key)
+
+        # TODO use the appropriate ResourceDefinition constructor
+        if isinstance(value, Sequence):
+            result.clear()
+            for item in value:
+                result.append(self.prepare_resource_definition(item))
+        else:
+            result.append(self.prepare_resource_definition(value))
 
 
 class ObjectInstantiationMapping(BaseMapping):

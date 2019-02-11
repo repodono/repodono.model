@@ -3,6 +3,7 @@ from functools import partial
 from pathlib import Path
 from collections import (
     Sequence,
+    Mapping,
     MutableMapping,
 )
 
@@ -157,15 +158,15 @@ class FlatGroupedMapping(BaseMapping):
 class BaseTypedMapping(BaseMapping):
     """
     A mapping where assignment of some value is passed through the
-    specific class method which must be implemented.  This is to
-    establish a standard for restriction of types assigned.
+    prepare_from_value method method which must be implemented.  This is
+    to establish a standard for restriction of types assigned.
     """
 
     @classmethod
     def prepare_from_value(cls, value):
         """
         This must be implemented by the subclasses as it is specific to
-        their implementations.
+        their implementations.  Typically a classmethod should suffice.
         """
 
     def __setitem__(self, key, value):
@@ -279,8 +280,7 @@ class ResourceDefinitionMapping(BaseSequenceTypedMapping):
 
     @classmethod
     def prepare_from_value(cls, value):
-        kwargs = {}
-        kwargs.update(value)
+        kwargs = dict(value)
 
         # quick check
         if ('__call__' in kwargs) == ('__init__' in kwargs):
@@ -296,7 +296,7 @@ class ResourceDefinitionMapping(BaseSequenceTypedMapping):
         return cls.create_resource_definition(name, call, init, kwargs)
 
 
-class ObjectInstantiationMapping(BaseMapping):
+class ObjectInstantiationMapping(BaseTypedMapping):
     """
     This takes a list of dicts that contain the prerequisite keys and
     values and it will invoke the target constructor or function as
@@ -321,22 +321,31 @@ class ObjectInstantiationMapping(BaseMapping):
         For a given mapping resolve the object and construct a mapping
         """
 
-        super().__init__()
+        self.__vars = vars_
+        super().__init__(items)
 
-        for item in items:
-            # XXX TODO refactor this into a function
-            # name = assignment
-            kwargs = {}
-            kwargs.update(item)
-            name = kwargs.pop('__name__')
-            entry = EntryPoint.parse('target=' + kwargs.pop('__init__'))
-            target = entry.resolve()
-            kwargs = {
-                key: map_vars_value(value, vars_=vars_)
-                for key, value in kwargs.items()
-            }
-            object_ = target(**kwargs)
-            self.__setitem__(name, object_)
+    def prepare_from_value(self, value):
+        kwargs = dict(value)
+        entry = EntryPoint.parse('target=' + kwargs.pop('__init__'))
+        target = entry.resolve()
+        kwargs = {
+            key: map_vars_value(value, vars_=self.__vars)
+            for key, value in kwargs.items()
+        }
+        return target(**kwargs)
+
+    def update(self, *a, **kw):
+        if len(a) != 1 or not (
+                isinstance(a[0], Sequence) and
+                a[0] and
+                len(a[0]) == 1 and
+                isinstance(a[0][0], Mapping)):
+            return super().update(*a, **kw)
+
+        super().update({
+            kwargs.pop('__name__'): kwargs
+            for kwargs in (dict(item) for item in a[0])
+        })
 
 
 def StructuredMapping(definition, structured_mapper=structured_mapper):

@@ -227,7 +227,7 @@ class StructuredMappingTestCase(unittest.TestCase):
 
 class ObjectInstantiationMappingTestCase(unittest.TestCase):
 
-    def test_stability(self):
+    def test_list_dict_name_construction(self):
         value = [{
             '__name__': 'thing',
             '__init__': 'repodono.model.testing:Thing',
@@ -237,6 +237,7 @@ class ObjectInstantiationMappingTestCase(unittest.TestCase):
         vars_ = {'a_path': marker}
         result = ObjectInstantiationMapping(value, vars_)
         self.assertEqual({'a_path': marker}, vars_)
+        # ensure source value is untouched
         self.assertEqual([{
             '__name__': 'thing',
             '__init__': 'repodono.model.testing:Thing',
@@ -244,6 +245,23 @@ class ObjectInstantiationMappingTestCase(unittest.TestCase):
         }], value)
         self.assertTrue(isinstance(result['thing'], Thing))
         self.assertEqual(result['thing'].path, marker)
+
+    def test_key_value_construction(self):
+        value = {'target': {
+            '__init__': 'repodono.model.testing:Thing',
+            'path': 'a_path',
+        }}
+        marker = object()
+        vars_ = {'a_path': marker}
+        result = ObjectInstantiationMapping(value, vars_)
+        self.assertEqual({'a_path': marker}, vars_)
+        # ensure source value is untouched
+        self.assertEqual({'target': {
+            '__init__': 'repodono.model.testing:Thing',
+            'path': 'a_path',
+        }}, value)
+        self.assertTrue(isinstance(result['target'], Thing))
+        self.assertEqual(result['target'].path, marker)
 
 
 class ResourceDefinitionMappingTestCase(unittest.TestCase):

@@ -160,7 +160,44 @@ class PathMapping(BaseMapping):
         super().__setitem__(key, Path(value))
 
 
-class ResourceDefinitionMapping(BaseMapping):
+class BaseSequenceMapping(BaseMapping):
+    """
+    A base mapping with values that are a sequence of elements of a
+    uniform type produced by a well-defined class method.  Values being
+    assigned to instances of such a mapping will be another mapping or
+    a list of mappings that contain the requisite keys.  Assignment of
+    a single mapping will simply be appended to the internal mapping,
+    while assignment of a complete list will set the value to the
+    list of instances of the uniform type.
+    """
+
+    @classmethod
+    def prepare_from_value(cls, value):
+        """
+        This must be implemented by the subclasses as it is specific to
+        their implementations.
+        """
+
+    def __setitem__(self, key, value):
+        # FIXME validate key being a valid URL template
+        # FIXME this needs to be co-ordinated with the endpoint mapping
+        # implementation.
+        if key not in self:
+            result = []
+            super().__setitem__(key, result)
+        else:
+            result = self.get(key)
+
+        # TODO use the appropriate ResourceDefinition constructor
+        if isinstance(value, Sequence):
+            result.clear()
+            for item in value:
+                result.append(self.prepare_from_value(item))
+        else:
+            result.append(self.prepare_from_value(value))
+
+
+class ResourceDefinitionMapping(BaseSequenceMapping):
     """
     A resource definition mapping is a mapping with keys that reference
     some path fragment of some URI, and the value assigned being a dict
@@ -227,9 +264,9 @@ class ResourceDefinitionMapping(BaseMapping):
                 name, init, kwargs)
 
     @classmethod
-    def prepare_resource_definition(cls, item):
+    def prepare_from_value(cls, value):
         kwargs = {}
-        kwargs.update(item)
+        kwargs.update(value)
 
         # quick check
         if ('__call__' in kwargs) == ('__init__' in kwargs):
@@ -243,24 +280,6 @@ class ResourceDefinitionMapping(BaseMapping):
         call = kwargs.pop('__call__', None)
         init = kwargs.pop('__init__', None)
         return cls.create_resource_definition(name, call, init, kwargs)
-
-    def __setitem__(self, key, value):
-        # FIXME validate key being a valid URL template
-        # FIXME this needs to be co-ordinated with the endpoint mapping
-        # implementation.
-        if key not in self:
-            result = []
-            super().__setitem__(key, result)
-        else:
-            result = self.get(key)
-
-        # TODO use the appropriate ResourceDefinition constructor
-        if isinstance(value, Sequence):
-            result.clear()
-            for item in value:
-                result.append(self.prepare_resource_definition(item))
-        else:
-            result.append(self.prepare_resource_definition(value))
 
 
 class ObjectInstantiationMapping(BaseMapping):

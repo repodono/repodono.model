@@ -3,6 +3,7 @@ from repodono.model.base import (
     BaseMapping,
     PathMapping,
     ObjectInstantiationMapping,
+    ResourceDefinitionMapping,
 )
 
 
@@ -26,4 +27,15 @@ class Environment(StructuredMapping((
     paths = "repodono.model.base:PathMapping"
     [[Environment.environment]]
     objects = "repodono.model.base:ObjectInstantiationMapping"
+    """
+
+
+class Resource(StructuredMapping((
+    ('resource', ResourceDefinitionMapping),
+))):
+    """
+    Default resource mapping implementation
+
+    [[Resource]]
+    resource = "repodono.model.base:BaseMapping"
     """

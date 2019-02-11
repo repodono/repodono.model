@@ -4,6 +4,7 @@ from tempfile import TemporaryDirectory
 
 from repodono.model.config import Configuration
 from repodono.model.environment import Environment
+from repodono.model.environment import Resource
 
 """
 [environment.variables]  # strings??
@@ -121,3 +122,20 @@ class EnvironmentTestCase(unittest.TestCase):
             'number': 0,
             'texts': ['hello', 'hello'],
         }, env['thing'].path)
+
+
+class ResourceTestCase(unittest.TestCase):
+
+    def test_basic_resource(self):
+        root = TemporaryDirectory()
+        self.addCleanup(root.cleanup)
+        config = Configuration("""
+        [environment.paths]
+        root_path = %r
+        [[resource."/entry/{entry_id}"]]
+        __name__ = "blog_entry"
+        __init__ = "repodono.model.testing:Thing"
+        path = "root_path"
+        """ % (root.name,))
+        resource = Resource(config)
+        self.assertEqual(resource['/entry/{entry_id}'][0].name, 'blog_entry')

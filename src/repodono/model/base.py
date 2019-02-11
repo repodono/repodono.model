@@ -154,21 +154,11 @@ class FlatGroupedMapping(BaseMapping):
         return repr(self.__combined())
 
 
-class PathMapping(BaseMapping):
-
-    def __setitem__(self, key, value):
-        super().__setitem__(key, Path(value))
-
-
-class BaseSequenceMapping(BaseMapping):
+class BaseTypedMapping(BaseMapping):
     """
-    A base mapping with values that are a sequence of elements of a
-    uniform type produced by a well-defined class method.  Values being
-    assigned to instances of such a mapping will be another mapping or
-    a list of mappings that contain the requisite keys.  Assignment of
-    a single mapping will simply be appended to the internal mapping,
-    while assignment of a complete list will set the value to the
-    list of instances of the uniform type.
+    A mapping where assignment of some value is passed through the
+    specific class method which must be implemented.  This is to
+    establish a standard for restriction of types assigned.
     """
 
     @classmethod
@@ -179,12 +169,36 @@ class BaseSequenceMapping(BaseMapping):
         """
 
     def __setitem__(self, key, value):
+        super().__setitem__(key, self.prepare_from_value(value))
+
+
+class PathMapping(BaseTypedMapping):
+
+    @classmethod
+    def prepare_from_value(self, value):
+        return Path(value)
+
+
+class BaseSequenceTypedMapping(BaseTypedMapping):
+    """
+    A base mapping with values that are a sequence of elements of a
+    uniform type produced by a well-defined class method.  Values being
+    assigned to instances of such a mapping will be another mapping or
+    a list of mappings that contain the requisite keys.  Assignment of
+    a single mapping will simply be appended to the internal mapping,
+    while assignment of a complete list will set the value to the
+    list of instances of the uniform type.
+    """
+
+    def __setitem__(self, key, value):
         # FIXME validate key being a valid URL template
         # FIXME this needs to be co-ordinated with the endpoint mapping
         # implementation.
         if key not in self:
             result = []
-            super().__setitem__(key, result)
+            # using the base mapping directly as the semantics of how
+            # assignments are done have been changed here
+            BaseMapping.__setitem__(self, key, result)
         else:
             result = self.get(key)
 
@@ -197,7 +211,7 @@ class BaseSequenceMapping(BaseMapping):
             result.append(self.prepare_from_value(value))
 
 
-class ResourceDefinitionMapping(BaseSequenceMapping):
+class ResourceDefinitionMapping(BaseSequenceTypedMapping):
     """
     A resource definition mapping is a mapping with keys that reference
     some path fragment of some URI, and the value assigned being a dict

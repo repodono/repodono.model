@@ -21,6 +21,11 @@ development.
 Features
 --------
 
+The following are a list of features currently being implemented.
+
+Base Environment
+~~~~~~~~~~~~~~~~
+
 An ``Environment`` mapping class that would load a toml configuration
 string that has the following three sections:
 
@@ -51,3 +56,44 @@ defined by the class constructor for each of the sections.
     PosixPath('/var/www/site.example.com')
     >>> env['site_root']
     PosixPath('/var/www/site.example.com')
+
+Generic routing specification
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+For specifying variables to be made available for a given route/endpoint
+acceptable for the generated application, the routes are defined using a
+subset of the syntax as defined in RFC 6570 - URI Template.
+
+The reason for this limitation is done for practical reasons, as there
+are existing routing frameworks that have their own specific limitations
+and thus keeping to a common subset will ease the conversion to handlers
+for those frameworks.
+
+Currently, the supported variable definitions are:
+
+- Standard expansion or a series of one, e.g. ``/work/{id}/{option}``
+- Slash-prefixed path fragments, e.g. ``/root{/some_path*}``
+
+  - One of the more generally targeted usage for server side routing.
+
+Restrictions that may be lifted:
+
+- Standard expansion with length modifiers, e.g. ``{var:3}``
+
+Restrictions that are unlikely to be supported in the future:
+
+- All routes must begin with '/'
+- Reserved expansion: too vague, conflicts with path fragment expansion.
+  e.g. ``/{+some_var}``, not to mention the exact behavior will become
+  undefined when integrated with certain target frameworks.
+- Standard expansion with value modifiers ``/{var*}``
+- Path-style parameters, semicolon-prefixed.  e.g. ``/{;some_var}``
+- Any additional interpretation of standard expansion
+- Multiple variables expressions are not supported (e.g. ``/{x,y}``,
+  write instead ``/{x},{y}``)
+- Fragment expansions will be ignored (as fragments are typically not
+  submitted to the server by clients through http).
+- Form-style query ignored (as supported backend targets typically have
+  their own implementation for dealing with query fragments sent by
+  clients.  Thus everything after a query token ``?`` will be ignored.
+- Standard expansion with value modifiers ``{var*}``

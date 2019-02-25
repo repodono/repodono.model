@@ -35,7 +35,9 @@ setup(
     install_requires=[
         'setuptools',
         # -*- Extra requirements: -*-
+        'regex',
         'toml',
+        'uritemplate',
     ],
     extras_require={
     },

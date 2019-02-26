@@ -1,11 +1,12 @@
 import regex
+from functools import partial
 from uritemplate.variable import URIVariable
 
 
 nr_chars = regex.escape(URIVariable.reserved)
 
 raw_single_pattern = r"(?:{joiner}(?{option}[^" + nr_chars + "]{count}))"
-raw_list_pattern = r"(?:{joiner}(?{option}[^" + nr_chars + "]+)){count}"
+raw_list_pattern = r"(?:{joiner}(?{option}[^" + nr_chars + "]+)){explode}"
 
 # if placeholder wrapper be done, it could isntead be:
 # raw_single_pattern = r"(?:{joiner}" + group("[^" + nr_chars + "]{count})")
@@ -18,7 +19,7 @@ def check_variable(variable):
     if len(variable.variables) != 1:
         raise TypeError("multiple variables not supported")
 
-    if variable.operator in '#;+':
+    if variable.operator and variable.operator in '#;+':
         raise TypeError("unsupported operator '%s'" % variable.operator)
 
     return variable.variables[0][0]
@@ -35,7 +36,11 @@ def default_pattern_finalizer(pattern_str, variable):
     return name, pattern_str.format(
         option='P<%s>' % name,
         joiner=variable.operator,
-        count='+' if variable.variables[0][1]['explode'] else '',
+        # for now ensure at least one value, if the value modifier is to
+        # be supported it should be replaced with a specific max count?
+        # perhaps {1,count}
+        count='+',
+        explode='+' if variable.variables[0][1]['explode'] else '',
     )
 
 
@@ -45,7 +50,9 @@ def noncapture_pattern_finalizer(pattern_str, variable):
     the group that provides the value matched for the name.
 
     This pattern ensures that the group is not captured to allow the
-    name be used/captured under a different context (or usage).
+    name be used/captured under a different context (or usage), or
+    wrapped by specific routing frameworks that do not use raw regex as
+    the means to encode routes for their application framework.
     """
 
     name = check_variable(variable)
@@ -57,36 +64,49 @@ def noncapture_pattern_finalizer(pattern_str, variable):
     )
 
 
-def default_value(variable, pattern_finalizer=default_pattern_finalizer):
-    return pattern_finalizer(raw_single_pattern, variable)
-
-
-def default_path(variable, pattern_finalizer=default_pattern_finalizer):
-    return pattern_finalizer(raw_list_pattern, variable)
-
-
-default_operator_handlers = (
-    ('', default_value),
-    ('/', default_path),
+raw_operator_patterns = (
+    ('', raw_single_pattern),
+    ('/', raw_list_pattern),
+    ('.', raw_list_pattern),
 )
 
 
-class MatchVariable(object):
+def build_pattern_map(
+        operator_patterns=raw_operator_patterns,
+        pattern_finalizer=default_pattern_finalizer):
 
-    def __init__(self, variable):
-        self.variable = variable
+    def finalizer_generator(raw_pattern):
+        return partial(pattern_finalizer, pattern_str=raw_pattern)
 
-    def to_token(self):
-        """
-        Low level function that return a list of 2-tuple, with the name
-        of the variable (if applicable) and the pattern for that group.
-        """
+    return {
+        operator: finalizer_generator(pattern)
+        for operator, pattern in operator_patterns
+    }
 
 
-class MatchTemplate(object):
+default_regex_pattern_map = build_pattern_map()
 
-    def __init__(self, template, matcher=MatchVariable):
-        self.template = template
+
+class TemplateRegexFactory(object):
+
+    pattern_map = build_pattern_map()
+
+    def _iter_variables(self, template):
+        for variable in template.variables:
+            # XXX KeyError unhandled
+            name, pat = self.pattern_map[variable.operator](variable=variable)
+            yield (name, '{%s}' % variable.original, pat)
+
+    def __call__(self, template):
+        results = []
+        uri = template.uri
+        for name, chunk, pat in self._iter_variables(template):
+            head, uri = uri.split(chunk, 1)
+            results.append(head)
+            results.append(pat)
+
+        results.append(uri)
+        return regex.compile(''.join(results))
 
 
 def variable_to_regexp(variable):
@@ -120,4 +140,8 @@ def template_to_regex(template):
 
 
 def match(template, uri):
+    pass
+
+
+def validate(template):
     pass

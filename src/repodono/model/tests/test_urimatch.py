@@ -3,23 +3,24 @@ import unittest
 from uritemplate import URITemplate
 
 from repodono.model.urimatch import match
-from repodono.model.urimatch import validate
 from repodono.model.urimatch import TemplateRegexFactory
 
 
 class ValidityTestCase(unittest.TestCase):
 
+    validate = TemplateRegexFactory().validate
+
     def assertSupported(self, tmplstr):
         template = URITemplate(tmplstr)
         self.assertTrue(
-            validate(template),
+            self.validate(template),
             "%r should be a valid template but is marked as invalid" % tmplstr
         )
 
     def assertUnsupported(self, tmplstr):
         template = URITemplate(tmplstr)
         self.assertFalse(
-            validate(template),
+            self.validate(template),
             "%r should be an invalid template but is marked as valid" % tmplstr
         )
 
@@ -30,7 +31,9 @@ class ValidityTestCase(unittest.TestCase):
 
     def test_invalid_templates(self):
         self.assertUnsupported('{count}')  # missing leading /
+        self.assertUnsupported('{}')
         self.assertUnsupported('/target?foo={count}')
+        self.assertUnsupported('/{x,y}')
 
 
 class TemplateRegexFactoryTestCase(unittest.TestCase):

@@ -7,15 +7,18 @@ nr_chars = regex.escape(URIVariable.reserved)
 
 raw_single_pattern = r"(?:{joiner}(?{option}[^" + nr_chars + "]{count}))"
 raw_list_pattern = r"(?:{joiner}(?{option}[^" + nr_chars + "]+)){explode}"
+raw_empty_pattern = ""
 
 # if placeholder wrapper be done, it could isntead be:
 # raw_single_pattern = r"(?:{joiner}" + group("[^" + nr_chars + "]{count})")
 
 
 def check_variable(variable):
+    # TODO roll this into a proper place?
     if not isinstance(variable, URIVariable):
         raise TypeError("'variable' must be a URIVariable")
 
+    # XXX this check is duplicated later
     if len(variable.variables) != 1:
         raise TypeError("multiple variables not supported")
 
@@ -68,6 +71,8 @@ raw_operator_patterns = (
     ('', raw_single_pattern),
     ('/', raw_list_pattern),
     ('.', raw_list_pattern),
+    ('?', raw_empty_pattern),
+    ('&', raw_empty_pattern),
 )
 
 
@@ -91,13 +96,51 @@ class TemplateRegexFactory(object):
 
     pattern_map = build_pattern_map()
 
+    def _validate(self, variable):
+        if variable.operator not in self.pattern_map:
+            raise ValueError("operator '%s' unsupported by %s" % (
+                variable.operator,
+                type(self),
+            ))
+        # XXX this check is duplicated via check_variable
+        if len(variable.variables) != 1:
+            raise ValueError("multiple variables not supported")
+
     def _iter_variables(self, template):
         for variable in template.variables:
-            # XXX KeyError unhandled
+            self._validate(variable)
             name, pat = self.pattern_map[variable.operator](variable=variable)
+            if not pat:
+                return
             yield (name, '{%s}' % variable.original, pat)
 
+    def _validate_uri(self, template):
+        if not ((template.uri[:1] == '/') or (
+                (template.uri[:1] == '{') and
+                template.variables and
+                template.variables[0].operator == '/')):
+            raise ValueError(
+                "unsupported uritemplate: missing a leading '/' or "
+                "'{/path}' variable"
+            )
+        if '?' in template.expand():
+            raise ValueError(
+                "unsupported uritemplate: query expansion '?' must be defined "
+                "using a query expansion (e.g. '{?query}')"
+            )
+
+    def validate(self, template):
+        try:
+            self._validate_uri(template)
+            for variable in template.variables:
+                self._validate(variable)
+        except ValueError:
+            # should log an error.
+            return False
+        return True
+
     def __call__(self, template):
+        self._validate_uri(template)
         results = []
         uri = template.uri
         for name, chunk, pat in self._iter_variables(template):

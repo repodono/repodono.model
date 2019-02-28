@@ -1,26 +1,47 @@
 import unittest
+import regex
 
 from uritemplate import URITemplate
 
+from repodono.model.urimatch import template_to_regex_patternstr
+from repodono.model.urimatch import check_variable
 from repodono.model.urimatch import match
-from repodono.model.urimatch import TemplateRegexFactory
+
+
+class BaseTestCase(unittest.TestCase):
+
+    def test_check_variable(self):
+        with self.assertRaises(ValueError) as e:
+            check_variable('name')
+
+        self.assertEqual(
+            "'variable' argument must be a URIVariable",
+            str(e.exception)
+        )
+
+        failure = URITemplate('{bad,name}')
+        with self.assertRaises(ValueError) as e:
+            check_variable(failure.variables[0])
+
+        self.assertEqual(
+            'multiple variables {bad,name} not supported',
+            str(e.exception)
+        )
 
 
 class ValidityTestCase(unittest.TestCase):
 
-    validate = TemplateRegexFactory().validate
-
     def assertSupported(self, tmplstr):
         template = URITemplate(tmplstr)
         self.assertTrue(
-            self.validate(template),
+            template_to_regex_patternstr.supported(template),
             "%r should be a valid template but is marked as invalid" % tmplstr
         )
 
     def assertUnsupported(self, tmplstr):
         template = URITemplate(tmplstr)
         self.assertFalse(
-            self.validate(template),
+            template_to_regex_patternstr.supported(template),
             "%r should be an invalid template but is marked as valid" % tmplstr
         )
 
@@ -34,14 +55,16 @@ class ValidityTestCase(unittest.TestCase):
         self.assertUnsupported('{}')
         self.assertUnsupported('/target?foo={count}')
         self.assertUnsupported('/{x,y}')
+        self.assertUnsupported('/{+values}')
+        self.assertUnsupported('{/values}/{values}')
+        self.assertUnsupported('/{x,y}/{y}')
 
 
 class TemplateRegexFactoryTestCase(unittest.TestCase):
 
     def test_basic(self):
         template = URITemplate('/root/{target}{/path*}')
-        factory = TemplateRegexFactory()
-        rule = factory(template)
+        rule = regex.compile(template_to_regex_patternstr(template))
         match = rule.match('/root/some_target/a/nested/path')
         self.assertEqual(
             # TODO figure out how to remap it all back down to a string
@@ -56,8 +79,7 @@ class TemplateRegexFactoryTestCase(unittest.TestCase):
 
     def test_suffixed(self):
         template = URITemplate('/root/{target}{/path*}/somewhere')
-        factory = TemplateRegexFactory()
-        rule = factory(template)
+        rule = regex.compile(template_to_regex_patternstr(template))
         self.assertFalse(rule.match('/root/some_target/a/nested/path'))
 
         match = rule.match('/root/some_target/a/nested/path/somewhere')
@@ -73,30 +95,36 @@ class TemplateRegexFactoryTestCase(unittest.TestCase):
         )
 
 
-@unittest.skip("not implemented yet")
 class UriMatchTestCase(unittest.TestCase):
 
     def test_simple_variable_matcher(self):
         template = URITemplate('/{count}')
-        url = '/one,two,three'
+        url = '/123'
         result = match(template, url)
         self.assertEqual({
-            'count': 'one,two,three',
+            'count': '123',
         }, result)
+
+    def test_no_match(self):
+        template = URITemplate('/{count}')
+        url = '123'
+        result = match(template, url)
+        # TODO whether empty results are good for no match.
+        self.assertEqual({}, result)
 
     def test_single_path_matcher(self):
         template = URITemplate('{/count}')
-        url = '/one,two,three'
+        url = '/root/foo/bar'
         result = match(template, url)
+        # TODO figure out whether to support this kind of partial match
         self.assertEqual({
-            'count': ['one', 'two', 'three'],
+            'count': 'root',
         }, result)
 
     def test_multi_path_matcher(self):
-        template = URITemplate('{/count*}')
-        # Note: `,` should be provided as the encoded value `%2C`
-        url = '/one,two,three/some/path'
+        template = URITemplate('{/path*}')
+        url = '/one%2Ctwo%2Cthree/some/path'
         result = match(template, url)
         self.assertEqual({
-            'count': ['one,two,three', 'some', 'path'],
+            'path': ['one%2Ctwo%2Cthree', 'some', 'path'],
         }, result)

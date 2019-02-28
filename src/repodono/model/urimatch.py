@@ -12,18 +12,29 @@ raw_empty_pattern = ""
 # if placeholder wrapper be done, it could isntead be:
 # raw_single_pattern = r"(?:{joiner}" + group("[^" + nr_chars + "]{count})")
 
+raw_operator_patterns = (
+    ('', raw_single_pattern),
+    ('/', raw_list_pattern),
+    ('.', raw_list_pattern),
+    ('?', raw_empty_pattern),
+    ('&', raw_empty_pattern),
+)
+
 
 def check_variable(variable):
-    # TODO roll this into a proper place?
+    """
+    Checks whether the provided URIVariable is supported by the variable
+    matching framework as implemented in this package.  All functions as
+    implemented in this framework will assume this is the canonical
+    validation function.
+    """
+
     if not isinstance(variable, URIVariable):
-        raise TypeError("'variable' must be a URIVariable")
+        raise ValueError("'variable' argument must be a URIVariable")
 
-    # XXX this check is duplicated later
     if len(variable.variables) != 1:
-        raise TypeError("multiple variables not supported")
-
-    if variable.operator and variable.operator in '#;+':
-        raise TypeError("unsupported operator '%s'" % variable.operator)
+        raise ValueError(
+            "multiple variables {%s} not supported" % variable.original)
 
     return variable.variables[0][0]
 
@@ -67,15 +78,6 @@ def noncapture_pattern_finalizer(pattern_str, variable):
     )
 
 
-raw_operator_patterns = (
-    ('', raw_single_pattern),
-    ('/', raw_list_pattern),
-    ('.', raw_list_pattern),
-    ('?', raw_empty_pattern),
-    ('&', raw_empty_pattern),
-)
-
-
 def build_pattern_map(
         operator_patterns=raw_operator_patterns,
         pattern_finalizer=default_pattern_finalizer):
@@ -89,26 +91,24 @@ def build_pattern_map(
     }
 
 
-default_regex_pattern_map = build_pattern_map()
+class TemplateConverterFactory(object):
 
+    def __init__(self, operator_patterns, pattern_finalizer):
+        self.pattern_map = build_pattern_map(
+            operator_patterns=operator_patterns,
+            pattern_finalizer=pattern_finalizer,
+        )
 
-class TemplateRegexFactory(object):
-
-    pattern_map = build_pattern_map()
-
-    def _validate(self, variable):
+    def _validate_variable(self, variable):
         if variable.operator not in self.pattern_map:
             raise ValueError("operator '%s' unsupported by %s" % (
                 variable.operator,
                 type(self),
             ))
-        # XXX this check is duplicated via check_variable
-        if len(variable.variables) != 1:
-            raise ValueError("multiple variables not supported")
 
     def _iter_variables(self, template):
         for variable in template.variables:
-            self._validate(variable)
+            self._validate_variable(variable)
             name, pat = self.pattern_map[variable.operator](variable=variable)
             if not pat:
                 return
@@ -128,16 +128,31 @@ class TemplateRegexFactory(object):
                 "unsupported uritemplate: query expansion '?' must be defined "
                 "using a query expansion (e.g. '{?query}')"
             )
+        if len(template.variables) > len(template.variable_names):
+            raise ValueError(
+                "unsupported uritemplate: variable names have been reused"
+                # TODO list out variables that were reused
+            )
+        # the following will not be checked as it will be checked by
+        # _validate_variable for each variable name
+        # if len(template.variables) < len(template.variable_names):
 
-    def validate(self, template):
+    def supported(self, template):
         try:
-            self._validate_uri(template)
-            for variable in template.variables:
-                self._validate(variable)
+            self.validate(template)
         except ValueError:
             # should log an error.
             return False
         return True
+
+    def validate(self, template):
+        self._validate_uri(template)
+        for variable in template.variables:
+            # this validates whether the operator is supported
+            self._validate_variable(variable)
+            # this checks for the other requirements common to all
+            # variables as implemented by this framework.
+            check_variable(variable)
 
     def __call__(self, template):
         self._validate_uri(template)
@@ -149,42 +164,60 @@ class TemplateRegexFactory(object):
             results.append(pat)
 
         results.append(uri)
-        return regex.compile(''.join(results))
+        return ''.join(results)
 
 
-def variable_to_regexp(variable):
+template_to_regex_patternstr = TemplateConverterFactory(
+    operator_patterns=raw_operator_patterns,
+    pattern_finalizer=default_pattern_finalizer,
+)
+
+
+class UriTemplateMatcher(object):
     """
-    Convert a URIVariable to a regular expression string.
+    The URI Template matcher.
     """
 
+    def __init__(self, template):
+        """
+        Arguments:
 
-def template_to_regex(template):
+        uritemplate
+            The URITemplate object to build a matcher from.
+        """
 
-    # validate all variables first
+        self.template = template
+        self.regex_pattern = regex.compile(
+            template_to_regex_patternstr(template))
+        self.variables = {}
+        for variable in self.template.variables:
+            self.variables.update(variable.variables)
 
-    # check that no duplicates are done
-    if len(template.variable_names) < len(template.variables):
-        raise ValueError('multiple definitions of the same')
+    def __call__(self, uri):
+        """
+        Arguments:
 
-    # iterate through the list of variables, stick in path fragments,
-    # until a variable that start with '?' is encountered, where every
-    # one of them will be marked as arguments.  Anything else that do
-    # not start with & is ignored/warned
+        uri
+            The uri to match.
+        """
 
-    # URL path parameter will NOT be supported due to everything
-    # surrounding this particular syntax is too underspecified for any
-    # sensible use case.  (Any variable start with ';' will be an error
+        match = self.regex_pattern.match(uri)
+        if not match:
+            # TODO verify that an empty mapping is a suitable response
+            # for no matches
+            return {}
 
-    # anything that is placed _after_ variables with start in ('?&')
-    # should also result in an error as typical frameworks consider that
-    # as part of a parameter.
+        results = {}
+        for variable, details in self.variables.items():
+            if details['explode']:
+                results[variable] = match.captures(variable)
+            else:
+                results[variable] = match.group(variable)
 
-    # the templater thing will have to combine the two.
+        return results
 
 
-def match(template, uri):
-    pass
-
-
-def validate(template):
-    pass
+def match(template, uri, __cache={}):
+    if template.uri not in __cache:
+        __cache[template.uri] = UriTemplateMatcher(template)
+    return __cache[template.uri](uri)

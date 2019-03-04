@@ -74,7 +74,8 @@ def noncapture_pattern_finalizer(pattern_str, variable):
     return name, pattern_str.format(
         option=':',
         joiner=variable.operator,
-        count='+' if variable.variables[0][1]['explode'] else '',
+        count='+',
+        explode='+' if variable.variables[0][1]['explode'] else '',
     )
 
 

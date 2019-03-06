@@ -155,17 +155,27 @@ class TemplateConverterFactory(object):
             # variables as implemented by this framework.
             check_variable(variable)
 
-    def __call__(self, template):
+    def iter_template(self, template):
+        """
+        Iterate through the template
+
+        Returns a 3-tuple of type, original and regex fragment, where the
+        type is the type of template fragment that produced the regex
+        fragment.
+        """
+
         self._validate_uri(template)
-        results = []
         uri = template.uri
         for name, chunk, pat in self._iter_variables(template):
             head, uri = uri.split(chunk, 1)
-            results.append(head)
-            results.append(pat)
+            yield (str, head, head)
+            yield (URIVariable, chunk, pat)
 
-        results.append(uri)
-        return ''.join(results)
+        yield (str, uri, uri)
+
+    def __call__(self, template):
+        return ''.join(
+            fragment for type_, orig, fragment in self.iter_template(template))
 
 
 template_to_regex_patternstr = TemplateConverterFactory(

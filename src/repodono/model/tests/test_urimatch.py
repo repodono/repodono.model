@@ -116,10 +116,8 @@ class UriMatchTestCase(unittest.TestCase):
         template = URITemplate('{/count}')
         url = '/root/foo/bar'
         result = match(template, url)
-        # TODO figure out whether to support this kind of partial match
-        self.assertEqual({
-            'count': 'root',
-        }, result)
+        # no match because too long
+        self.assertEqual({}, result)
 
     def test_multi_path_matcher(self):
         template = URITemplate('{/path*}')

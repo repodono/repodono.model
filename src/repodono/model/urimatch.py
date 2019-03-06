@@ -172,6 +172,7 @@ class TemplateConverterFactory(object):
             yield (URIVariable, chunk, pat)
 
         yield (str, uri, uri)
+        yield (str, '', '$')
 
     def __call__(self, template):
         return ''.join(
@@ -216,7 +217,7 @@ class UriTemplateMatcher(object):
         if not match:
             # TODO verify that an empty mapping is a suitable response
             # for no matches
-            return {}
+            return None
 
         results = {}
         for variable, details in self.variables.items():

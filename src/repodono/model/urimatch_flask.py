@@ -5,11 +5,12 @@ there.
 """
 
 from werkzeug.routing import Rule
+from uritemplate import URITemplate
 from uritemplate.variable import URIVariable
 
 from repodono.model.urimatch import (
     template_to_regex_patternstr,
-    UriTemplateMatcher,
+    URITemplateMatcher,
 )
 
 
@@ -32,8 +33,12 @@ class URITemplateRule(Rule):
             alias=alias, host=host,
         )
         # replace the rule with the template directly
-        self.rule = template
-        self.is_leaf = not template.uri.endswith('/')
+        self.rule = (
+            template
+            if isinstance(template, URITemplate) else
+            URITemplate(template)
+        )
+        self.is_leaf = not self.rule.uri.endswith('/')
 
     def compile(self):
         self._trace = []
@@ -47,7 +52,7 @@ class URITemplateRule(Rule):
         for t, c, p in template_to_regex_patternstr.iter_template(self.rule):
             self._trace.append((isinstance(t, URIVariable), c))
 
-        self._matcher = UriTemplateMatcher(self.rule)
+        self._matcher = URITemplateMatcher(self.rule)
 
     def match(self, path, method=None):
         if self.build_only:

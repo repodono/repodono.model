@@ -111,8 +111,6 @@ class TemplateConverterFactory(object):
         for variable in template.variables:
             self._validate_variable(variable)
             name, pat = self.pattern_map[variable.operator](variable=variable)
-            if not pat:
-                return
             yield (name, '{%s}' % variable.original, pat)
 
     def _validate_uri(self, template):
@@ -159,9 +157,9 @@ class TemplateConverterFactory(object):
         """
         Iterate through the template
 
-        Returns a 3-tuple of type, original and regex fragment, where the
-        type is the type of template fragment that produced the regex
-        fragment.
+        Yields a 3-tuple of type, original and regex fragment, where the
+        type is the type of original portion of the template fragment
+        that produced the regex fragment.
         """
 
         self._validate_uri(template)
@@ -172,6 +170,7 @@ class TemplateConverterFactory(object):
             yield (URIVariable, chunk, pat)
 
         yield (str, uri, uri)
+        # how to better represent the end token?
         yield (str, '', '$')
 
     def __call__(self, template):
@@ -185,7 +184,7 @@ template_to_regex_patternstr = TemplateConverterFactory(
 )
 
 
-class UriTemplateMatcher(object):
+class URITemplateMatcher(object):
     """
     The URI Template matcher.
     """
@@ -221,15 +220,20 @@ class UriTemplateMatcher(object):
 
         results = {}
         for variable, details in self.variables.items():
-            if details['explode']:
-                results[variable] = match.captures(variable)
-            else:
-                results[variable] = match.group(variable)
+            try:
+                if details['explode']:
+                    results[variable] = match.captures(variable)
+                else:
+                    results[variable] = match.group(variable)
+            except IndexError:
+                # XXX TODO figure out how to deal with operators that
+                # are defined to be undefined/unused in this system
+                continue
 
         return results
 
 
 def match(template, uri, __cache={}):
     if template.uri not in __cache:
-        __cache[template.uri] = UriTemplateMatcher(template)
+        __cache[template.uri] = URITemplateMatcher(template)
     return __cache[template.uri](uri)

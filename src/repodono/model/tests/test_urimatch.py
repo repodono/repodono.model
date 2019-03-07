@@ -6,6 +6,7 @@ from uritemplate import URITemplate
 from repodono.model.urimatch import template_to_regex_patternstr
 from repodono.model.urimatch import check_variable
 from repodono.model.urimatch import match
+from repodono.model.urimatch import URITemplateMatcher
 
 
 class BaseTestCase(unittest.TestCase):
@@ -109,15 +110,15 @@ class UriMatchTestCase(unittest.TestCase):
         template = URITemplate('/{count}')
         url = '123'
         result = match(template, url)
-        # TODO whether empty results are good for no match.
-        self.assertEqual({}, result)
+        self.assertIsNone(result)
 
     def test_single_path_matcher(self):
         template = URITemplate('{/count}')
         url = '/root/foo/bar'
         result = match(template, url)
-        # no match because too long
-        self.assertEqual({}, result)
+        # nothing because additional path segment separator which does
+        # not match.
+        self.assertIsNone(result)
 
     def test_multi_path_matcher(self):
         template = URITemplate('{/path*}')
@@ -125,4 +126,17 @@ class UriMatchTestCase(unittest.TestCase):
         result = match(template, url)
         self.assertEqual({
             'path': ['one%2Ctwo%2Cthree', 'some', 'path'],
+        }, result)
+
+    def test_interim_query(self):
+        # query variables are not exactly implemented due to significant
+        # complexities involved with integration with various platforms
+        # and frameworks.
+        template = URITemplate('/{root}/somewhere{?hello}')
+        url = '/value/somewhere'
+        matcher = URITemplateMatcher(template)
+        result = matcher(url)
+        # missing values ignored
+        self.assertEqual({
+            'root': 'value',
         }, result)

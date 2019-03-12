@@ -5,6 +5,7 @@ from collections import (
     Sequence,
     Mapping,
     MutableMapping,
+    defaultdict,
 )
 
 from pkg_resources import EntryPoint
@@ -365,3 +366,91 @@ def StructuredMapping(definition, structured_mapper=structured_mapper):
                 definition, raw_mapping, _maps=mappings, vars_=self)
 
     return StructuredMapping
+
+
+def create_empty_trie():
+    return defaultdict(create_empty_trie)
+
+
+class RouteTraceMapping(MutableMapping):
+    """
+    The implementation interally is effectively managed by a trie for
+    all the characters coming in.
+    """
+
+    def __init__(self, *a, **kw):
+        self.__trie = create_empty_trie()
+        self.__map = {}
+        self.__marker = object()
+        # calling self.update instead to use methods defined by parent
+        # that will properly cascade down to the implementation here.
+        self.update(*a, **kw)
+
+    def __get_trie_nodes(self, key):
+        node = self.__trie
+        nodes = []
+
+        def push(key):
+            if self.__marker in node:
+                # include all the intervening marked nodes
+                nodes.append((key, node[self.__marker]))
+
+        for i, c in enumerate(key):
+            push(key[:i])
+            if c not in node:
+                break
+            node = node[c]
+        else:
+            # add the final target node
+            push(key)
+        return nodes
+
+    def __getitem__(self, key):
+        if key not in self.__map:
+            raise KeyError(key)
+        return list(reversed(self.__get_trie_nodes(key)))
+
+    def get_partial(self, key):
+        return list(reversed(self.__get_trie_nodes(key)))
+
+    def __set_trie_nodes(self, key):
+        node = self.__trie
+        for c in key:
+            node = node[c]
+        return node
+
+    def __setitem__(self, key, value):
+        if not isinstance(key, str):
+            raise TypeError("keys must be of type 'str'")
+        self.__set_trie_nodes(key)[self.__marker] = value
+        self.__map[key] = value
+
+    def __delitem__(self, key):
+        self.__map.__delitem__(key)
+
+        stack = []
+        node = self.__trie
+        for c in key:
+            if len(node) == 1:
+                stack.append((node, c))
+            else:
+                stack = [(node, c)]
+            node = node[c]
+        else:
+            node.pop(self.__marker)
+            # could traverse the stack and manually pop
+            if not node and stack:
+                target, c = stack[0]
+                target.pop(c)
+
+    def __iter__(self):
+        return iter(self.__map)
+
+    def __len__(self):
+        return len(self.__map)
+
+    def __contains__(self, key):
+        return key in self.__map
+
+    def __repr__(self):
+        return repr(self.__map)

@@ -6,6 +6,7 @@ from repodono.model.base import (
     FlatGroupedMapping,
     ObjectInstantiationMapping,
     ResourceDefinitionMapping,
+    RouteTraceMapping,
     structured_mapper,
     StructuredMapping,
 )
@@ -411,3 +412,189 @@ class ResourceDefinitionMappingTestCase(unittest.TestCase):
         }]
         self.assertEqual(1, len(mapping['/some/path/{id}']))
         self.assertEqual(mapping['/some/path/{id}'][0].name, 'obj3')
+
+
+def dump_trie(o):
+    def dump(d):
+        for k, v in d.items():
+            if not isinstance(k, str):
+                yield ('_node_', str(v))
+            else:
+                yield (k, sorted(dump(v)))
+    return sorted(dump(o._RouteTraceMapping__trie))
+
+
+class RouteTraceMappingTestCase(unittest.TestCase):
+
+    def test_basic(self):
+        rt_map = RouteTraceMapping()
+        rt_map['/root/{foo}'] = 'root_foo'
+        self.assertEqual([
+            ('/root/{foo}', 'root_foo'),
+        ], rt_map['/root/{foo}'])
+        self.assertEqual(1, len(rt_map))
+
+        rt_map['/root/{foo}/{bar}'] = 'root_foo_bar'
+        self.assertEqual([
+            ('/root/{foo}', 'root_foo'),
+        ], rt_map['/root/{foo}'])
+        self.assertEqual([
+            ('/root/{foo}/{bar}', 'root_foo_bar'),
+            ('/root/{foo}', 'root_foo'),
+        ], rt_map['/root/{foo}/{bar}'])
+
+        self.assertEqual(2, len(rt_map))
+
+        self.assertEqual([
+            '/root/{foo}', '/root/{foo}/{bar}'
+        ], sorted(iter(rt_map)))
+
+    def test_repr(self):
+        rt_map = RouteTraceMapping()
+        rt_map['/root/{foo}'] = 'root_foo'
+        self.assertEqual(str(rt_map), str({'/root/{foo}': 'root_foo'}))
+
+    def test_get_partial(self):
+        # XXX TODO figure out if this can replace get
+        rt_map = RouteTraceMapping()
+        rt_map['/root/{foo}'] = 'root_foo'
+        rt_map['/root/{foo}/{bar}'] = 'root_foo_bar'
+        original = dump_trie(rt_map)
+        self.assertEqual([
+            ('/root/{foo}/{bar}', 'root_foo_bar'),
+            ('/root/{foo}', 'root_foo'),
+        ], rt_map.get_partial('/root/{foo}/{bar}/{baz}'))
+        self.assertEqual(original, dump_trie(rt_map))
+
+    def test_empty_str_key(self):
+        rt_map = RouteTraceMapping()
+        self.assertEqual(0, len(rt_map))
+
+        rt_map['/root/{foo}'] = 'root_foo'
+        self.assertEqual(1, len(rt_map))
+
+        self.assertEqual([
+            ('/root/{foo}', 'root_foo'),
+        ], rt_map['/root/{foo}'])
+
+        rt_map[''] = 'empty_str'
+        self.assertEqual([
+            ('/root/{foo}', 'root_foo'),
+            ('', 'empty_str'),
+        ], rt_map['/root/{foo}'])
+
+        self.assertEqual([
+            ('', 'empty_str'),
+        ], rt_map[''])
+
+        self.assertEqual(2, len(rt_map))
+
+        self.assertNotIn('/root', rt_map)
+        self.assertIn('/root/{foo}', rt_map)
+
+    def test_single_char_str_key(self):
+        rt_map = RouteTraceMapping()
+        rt_map['/'] = 'root'
+        rt_map['a'] = 'the_a_char'
+        original = dump_trie(rt_map)
+
+        self.assertEqual([
+            ('/', 'root'),
+        ], rt_map['/'])
+
+        self.assertEqual([
+            ('a', 'the_a_char'),
+        ], rt_map['a'])
+
+        self.assertEqual(original, dump_trie(rt_map))
+
+        with self.assertRaises(KeyError):
+            rt_map['////']
+
+    def test_non_str_key(self):
+        rt_map = RouteTraceMapping()
+        with self.assertRaises(TypeError):
+            rt_map[object()] = 1
+
+    def test_not_found(self):
+        rt_map = RouteTraceMapping()
+        original = dump_trie(rt_map)
+        with self.assertRaises(KeyError):
+            rt_map['/root/{foo}']
+
+        self.assertNotIn('/root', rt_map)
+
+        # does not add a new node on access
+        self.assertEqual(original, dump_trie(rt_map))
+
+    def test_partial_not_found(self):
+        rt_map = RouteTraceMapping()
+        rt_map['/root/{foo}'] = 'root_foo'
+        original = dump_trie(rt_map)
+
+        with self.assertRaises(KeyError):
+            rt_map['/root']
+
+        # not modified
+        self.assertEqual(original, dump_trie(rt_map))
+
+    def test_del_route_single(self):
+        rt_map = RouteTraceMapping()
+        original = dump_trie(rt_map)
+        rt_map['/root/{foo}'] = 'root_foo'
+        del rt_map['/root/{foo}']
+        self.assertNotIn('/root/{foo}', rt_map)
+        # restored to empty state
+        self.assertEqual(original, dump_trie(rt_map))
+
+    def test_del_route_multiple_long(self):
+        rt_map = RouteTraceMapping()
+        rt_map['/'] = 'root'
+        rt_map['/root/{foo}'] = 'root_foo'
+        original = dump_trie(rt_map)
+        rt_map['/root/{foo}/{bar}'] = 'root_foo_bar'
+        self.assertEqual(3, len(rt_map['/root/{foo}/{bar}']))
+        del rt_map['/root/{foo}/{bar}']
+        self.assertNotIn('/root/{foo}/{bar}', rt_map)
+        # restored to empty state
+        self.assertEqual(original, dump_trie(rt_map))
+
+        self.assertEqual([
+            ('/root/{foo}', 'root_foo'),
+            ('/', 'root'),
+        ], rt_map['/root/{foo}'])
+
+        with self.assertRaises(KeyError):
+            rt_map['/root/{foo}/{bar}']
+
+    def test_del_route_multiple_short(self):
+        rt_map = RouteTraceMapping()
+        rt_map['/root/{foo}/{bar}'] = 'root_foo_bar'
+        rt_map['/root/{foo}'] = 'root_foo'
+        original = dump_trie(rt_map)
+        rt_map['/'] = 'root'
+        self.assertEqual(1, len(rt_map['/']))
+        del rt_map['/']
+        self.assertNotIn('/', rt_map)
+        # restored to empty state
+        self.assertEqual(original, dump_trie(rt_map))
+
+        self.assertEqual([
+            ('/root/{foo}/{bar}', 'root_foo_bar'),
+            ('/root/{foo}', 'root_foo'),
+        ], rt_map['/root/{foo}/{bar}'])
+
+        with self.assertRaises(KeyError):
+            rt_map['/']
+
+    def test_del_route_common_remain(self):
+        rt_map = RouteTraceMapping()
+        rt_map['/root/{foo}/{bar}'] = 'root_foo_bar'
+        original = dump_trie(rt_map)
+        rt_map['/root/{foo}/{baz}'] = 'root_foo_baz'
+
+        self.assertEqual(1, len(rt_map['/root/{foo}/{baz}']))
+        del rt_map['/root/{foo}/{baz}']
+        self.assertNotIn('/root/{foo}/{baz}', rt_map)
+        # restored to empty state
+        self.assertEqual(original, dump_trie(rt_map))

@@ -539,12 +539,12 @@ class RouteTrieMappingTestCase(unittest.TestCase):
 
     def test_del_route_single(self):
         rt_map = RouteTrieMapping()
-        original = dump_trie(rt_map)
+        empty = dump_trie(rt_map)
         rt_map['/root/{foo}'] = 'root_foo'
         del rt_map['/root/{foo}']
         self.assertNotIn('/root/{foo}', rt_map)
         # restored to empty state
-        self.assertEqual(original, dump_trie(rt_map))
+        self.assertEqual(empty, dump_trie(rt_map))
 
     def test_del_route_multiple_long(self):
         rt_map = RouteTrieMapping()
@@ -575,7 +575,7 @@ class RouteTrieMappingTestCase(unittest.TestCase):
         self.assertEqual(1, len(rt_map['/']))
         del rt_map['/']
         self.assertNotIn('/', rt_map)
-        # restored to empty state
+        # restored to original state
         self.assertEqual(original, dump_trie(rt_map))
 
         self.assertEqual([
@@ -595,5 +595,41 @@ class RouteTrieMappingTestCase(unittest.TestCase):
         self.assertEqual(1, len(rt_map['/root/{foo}/{baz}']))
         del rt_map['/root/{foo}/{baz}']
         self.assertNotIn('/root/{foo}/{baz}', rt_map)
-        # restored to empty state
+        # restored to original state
         self.assertEqual(original, dump_trie(rt_map))
+
+    def test_del_route_short(self):
+        rt_map = RouteTrieMapping()
+        rt_map['/a'] = 'a'
+        rt_map['/b'] = 'b'
+        original = dump_trie(rt_map)
+        rt_map['/c'] = 'c'
+
+        self.assertEqual(1, len(rt_map['/c']))
+        del rt_map['/c']
+        self.assertNotIn('/c', rt_map)
+        # restored to original state
+        self.assertEqual(original, dump_trie(rt_map))
+
+        del rt_map['/b']
+        self.assertNotEqual(original, dump_trie(rt_map))
+
+    def test_default_values(self):
+        rt_map = RouteTrieMapping({
+            '/e/{root}': [
+                'a', 'b',
+            ],
+            '/e/{root}{/target*}': [
+                'b', 'a',
+            ],
+            '/w/{root}': [
+                'c', 'd',
+            ],
+        })
+        self.assertEqual([
+            ('/e/{root}{/target*}', ['b', 'a']),
+            ('/e/{root}', ['a', 'b']),
+        ], rt_map['/e/{root}{/target*}'])
+        self.assertEqual([
+            ('/w/{root}', ['c', 'd']),
+        ], rt_map['/w/{root}'])

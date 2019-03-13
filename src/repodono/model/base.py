@@ -380,6 +380,9 @@ class RouteTrieMapping(MutableMapping):
 
     def __init__(self, *a, **kw):
         self.__trie = create_empty_trie()
+        # while the usage of this inner attribute is similar enough to
+        # BaseMapping, this is going to remain distinct due to the
+        # special usage present.
         self.__map = {}
         self.__marker = object()
         # calling self.update instead to use methods defined by parent

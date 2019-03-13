@@ -372,7 +372,7 @@ def create_empty_trie():
     return defaultdict(create_empty_trie)
 
 
-class RouteTraceMapping(MutableMapping):
+class RouteTrieMapping(MutableMapping):
     """
     The implementation interally is effectively managed by a trie for
     all the characters coming in.

@@ -5,11 +5,11 @@ from uritemplate import URITemplate
 try:
     from werkzeug.routing import Map
     from werkzeug.exceptions import NotFound
-    from repodono.model.urimatch_flask import URITemplateRule
 except ImportError:  # pragma: no cover
     skip = True
 else:
     skip = False
+    from repodono.model.urimatch_flask import URITemplateRule
 
 
 @unittest.skipIf(skip, "werkzeug package not available")

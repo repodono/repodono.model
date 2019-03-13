@@ -6,7 +6,7 @@ from repodono.model.base import (
     FlatGroupedMapping,
     ObjectInstantiationMapping,
     ResourceDefinitionMapping,
-    RouteTraceMapping,
+    RouteTrieMapping,
     structured_mapper,
     StructuredMapping,
 )
@@ -421,13 +421,13 @@ def dump_trie(o):
                 yield ('_node_', str(v))
             else:
                 yield (k, sorted(dump(v)))
-    return sorted(dump(o._RouteTraceMapping__trie))
+    return sorted(dump(o._RouteTrieMapping__trie))
 
 
-class RouteTraceMappingTestCase(unittest.TestCase):
+class RouteTrieMappingTestCase(unittest.TestCase):
 
     def test_basic(self):
-        rt_map = RouteTraceMapping()
+        rt_map = RouteTrieMapping()
         rt_map['/root/{foo}'] = 'root_foo'
         self.assertEqual([
             ('/root/{foo}', 'root_foo'),
@@ -450,13 +450,13 @@ class RouteTraceMappingTestCase(unittest.TestCase):
         ], sorted(iter(rt_map)))
 
     def test_repr(self):
-        rt_map = RouteTraceMapping()
+        rt_map = RouteTrieMapping()
         rt_map['/root/{foo}'] = 'root_foo'
         self.assertEqual(str(rt_map), str({'/root/{foo}': 'root_foo'}))
 
     def test_get_partial(self):
         # XXX TODO figure out if this can replace get
-        rt_map = RouteTraceMapping()
+        rt_map = RouteTrieMapping()
         rt_map['/root/{foo}'] = 'root_foo'
         rt_map['/root/{foo}/{bar}'] = 'root_foo_bar'
         original = dump_trie(rt_map)
@@ -467,7 +467,7 @@ class RouteTraceMappingTestCase(unittest.TestCase):
         self.assertEqual(original, dump_trie(rt_map))
 
     def test_empty_str_key(self):
-        rt_map = RouteTraceMapping()
+        rt_map = RouteTrieMapping()
         self.assertEqual(0, len(rt_map))
 
         rt_map['/root/{foo}'] = 'root_foo'
@@ -493,7 +493,7 @@ class RouteTraceMappingTestCase(unittest.TestCase):
         self.assertIn('/root/{foo}', rt_map)
 
     def test_single_char_str_key(self):
-        rt_map = RouteTraceMapping()
+        rt_map = RouteTrieMapping()
         rt_map['/'] = 'root'
         rt_map['a'] = 'the_a_char'
         original = dump_trie(rt_map)
@@ -512,12 +512,12 @@ class RouteTraceMappingTestCase(unittest.TestCase):
             rt_map['////']
 
     def test_non_str_key(self):
-        rt_map = RouteTraceMapping()
+        rt_map = RouteTrieMapping()
         with self.assertRaises(TypeError):
             rt_map[object()] = 1
 
     def test_not_found(self):
-        rt_map = RouteTraceMapping()
+        rt_map = RouteTrieMapping()
         original = dump_trie(rt_map)
         with self.assertRaises(KeyError):
             rt_map['/root/{foo}']
@@ -528,7 +528,7 @@ class RouteTraceMappingTestCase(unittest.TestCase):
         self.assertEqual(original, dump_trie(rt_map))
 
     def test_partial_not_found(self):
-        rt_map = RouteTraceMapping()
+        rt_map = RouteTrieMapping()
         rt_map['/root/{foo}'] = 'root_foo'
         original = dump_trie(rt_map)
 
@@ -539,7 +539,7 @@ class RouteTraceMappingTestCase(unittest.TestCase):
         self.assertEqual(original, dump_trie(rt_map))
 
     def test_del_route_single(self):
-        rt_map = RouteTraceMapping()
+        rt_map = RouteTrieMapping()
         original = dump_trie(rt_map)
         rt_map['/root/{foo}'] = 'root_foo'
         del rt_map['/root/{foo}']
@@ -548,7 +548,7 @@ class RouteTraceMappingTestCase(unittest.TestCase):
         self.assertEqual(original, dump_trie(rt_map))
 
     def test_del_route_multiple_long(self):
-        rt_map = RouteTraceMapping()
+        rt_map = RouteTrieMapping()
         rt_map['/'] = 'root'
         rt_map['/root/{foo}'] = 'root_foo'
         original = dump_trie(rt_map)
@@ -568,7 +568,7 @@ class RouteTraceMappingTestCase(unittest.TestCase):
             rt_map['/root/{foo}/{bar}']
 
     def test_del_route_multiple_short(self):
-        rt_map = RouteTraceMapping()
+        rt_map = RouteTrieMapping()
         rt_map['/root/{foo}/{bar}'] = 'root_foo_bar'
         rt_map['/root/{foo}'] = 'root_foo'
         original = dump_trie(rt_map)
@@ -588,7 +588,7 @@ class RouteTraceMappingTestCase(unittest.TestCase):
             rt_map['/']
 
     def test_del_route_common_remain(self):
-        rt_map = RouteTraceMapping()
+        rt_map = RouteTrieMapping()
         rt_map['/root/{foo}/{bar}'] = 'root_foo_bar'
         original = dump_trie(rt_map)
         rt_map['/root/{foo}/{baz}'] = 'root_foo_baz'

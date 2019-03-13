@@ -410,7 +410,7 @@ class RouteTrieMapping(MutableMapping):
             raise KeyError(key)
         return list(reversed(self.__get_trie_nodes(key)))
 
-    def get_partial(self, key):
+    def get(self, key, default=NotImplemented):
         return list(reversed(self.__get_trie_nodes(key)))
 
     def __set_trie_nodes(self, key):

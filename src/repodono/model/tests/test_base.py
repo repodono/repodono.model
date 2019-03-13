@@ -454,8 +454,7 @@ class RouteTrieMappingTestCase(unittest.TestCase):
         rt_map['/root/{foo}'] = 'root_foo'
         self.assertEqual(str(rt_map), str({'/root/{foo}': 'root_foo'}))
 
-    def test_get_partial(self):
-        # XXX TODO figure out if this can replace get
+    def test_get(self):
         rt_map = RouteTrieMapping()
         rt_map['/root/{foo}'] = 'root_foo'
         rt_map['/root/{foo}/{bar}'] = 'root_foo_bar'
@@ -463,7 +462,7 @@ class RouteTrieMappingTestCase(unittest.TestCase):
         self.assertEqual([
             ('/root/{foo}/{bar}', 'root_foo_bar'),
             ('/root/{foo}', 'root_foo'),
-        ], rt_map.get_partial('/root/{foo}/{bar}/{baz}'))
+        ], rt_map.get('/root/{foo}/{bar}/{baz}'))
         self.assertEqual(original, dump_trie(rt_map))
 
     def test_empty_str_key(self):

@@ -156,11 +156,11 @@ class FlatGroupedMapping(BaseMapping):
         return repr(self.__combined())
 
 
-class BaseTypedMapping(BaseMapping):
+class BasePreparedMapping(BaseMapping):
     """
-    A mapping where assignment of some value is passed through the
-    prepare_from_value method method which must be implemented.  This is
-    to establish a standard for restriction of types assigned.
+    This base class provides a prepare_from_value classmethod which
+    should be implemented.  Although in some implementations it may be
+    necessary to implement as a normal method.
     """
 
     @classmethod
@@ -168,20 +168,44 @@ class BaseTypedMapping(BaseMapping):
         """
         This must be implemented by the subclasses as it is specific to
         their implementations.  Typically a classmethod should suffice.
+
+        Default implementation is the identity method.
         """
+
+        return value
+
+
+class PreparedMapping(BasePreparedMapping):
+    """
+    A mapping where assignment of some value is passed through the
+    prepare_from_value method method which must be implemented.  This is
+    to establish a standard for restriction of types assigned.
+    """
 
     def __setitem__(self, key, value):
         super().__setitem__(key, self.prepare_from_value(value))
 
 
-class PathMapping(BaseTypedMapping):
+class DeferredPreparedMapping(BasePreparedMapping):
+    """
+    A mapping where retrieval of some value from some key is passed
+    through the prepare_from_value method method which must be
+    implemented.  This is so that the retrieval is calculated at
+    access dynamically.
+    """
+
+    def __getitem__(self, key):
+        return self.prepare_from_value(super().__getitem__(key))
+
+
+class PathMapping(PreparedMapping):
 
     @classmethod
     def prepare_from_value(self, value):
         return Path(value)
 
 
-class BaseSequenceTypedMapping(BaseTypedMapping):
+class BaseSequencePreparedMapping(PreparedMapping):
     """
     A base mapping with values that are a sequence of elements of a
     uniform type produced by a well-defined class method.  Values being
@@ -213,7 +237,7 @@ class BaseSequenceTypedMapping(BaseTypedMapping):
             result.append(self.prepare_from_value(value))
 
 
-class ResourceDefinitionMapping(BaseSequenceTypedMapping):
+class ResourceDefinitionMapping(BaseSequencePreparedMapping):
     """
     A resource definition mapping is a mapping with keys that reference
     some path fragment of some URI, and the value assigned being a dict
@@ -297,7 +321,7 @@ class ResourceDefinitionMapping(BaseSequenceTypedMapping):
         return cls.create_resource_definition(name, call, init, kwargs)
 
 
-class ObjectInstantiationMapping(BaseTypedMapping):
+class ObjectInstantiationMapping(PreparedMapping):
     """
     This takes a list of dicts that contain the prerequisite keys and
     values and it will invoke the target constructor or function as

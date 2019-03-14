@@ -3,6 +3,9 @@ from ast import literal_eval
 
 from repodono.model.base import (
     BaseMapping,
+    BasePreparedMapping,
+    PreparedMapping,
+    DeferredPreparedMapping,
     FlatGroupedMapping,
     ObjectInstantiationMapping,
     ResourceDefinitionMapping,
@@ -27,6 +30,46 @@ class BaseMappingTestCase(unittest.TestCase):
     def test_casted(self):
         mapping = BaseMapping({'a': 1})
         self.assertEqual(mapping['a'], 1)
+
+    def test_prepared_mappings(self):
+        pm = PreparedMapping()
+        pm['1'] = 1
+        self.assertEqual(1, pm['1'])
+
+        dpm = DeferredPreparedMapping()
+        dpm['1'] = 1
+        self.assertEqual(1, dpm['1'])
+
+    def test_prepared_mappings_subclassing(self):
+        class BaseNoneValueMapping(BasePreparedMapping):
+            @classmethod
+            def prepare_from_value(cls, value):
+                if value is not None:
+                    raise TypeError('None required')
+
+        class NPM(BaseNoneValueMapping, PreparedMapping):
+            pass
+
+        class DPM(BaseNoneValueMapping, DeferredPreparedMapping):
+            pass
+
+        npm = NPM()
+        npm['0'] = None
+        with self.assertRaises(TypeError):
+            npm['1'] = 1
+
+        self.assertIn('0', npm)
+        self.assertNotIn('1', npm)
+
+        dpm = DPM()
+        dpm['0'] = None
+        dpm['1'] = 1
+
+        self.assertIn('0', dpm)
+        self.assertIn('1', dpm)
+        self.assertEqual(None, dpm['0'])
+        with self.assertRaises(TypeError):
+            dpm['1']
 
 
 class FlatGroupedMappingTestCase(unittest.TestCase):

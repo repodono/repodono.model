@@ -205,7 +205,7 @@ class PathMapping(PreparedMapping):
         return Path(value)
 
 
-class BaseSequencePreparedMapping(PreparedMapping):
+class SequencePreparedMapping(PreparedMapping):
     """
     A base mapping with values that are a sequence of elements of a
     uniform type produced by a well-defined class method.  Values being
@@ -217,9 +217,6 @@ class BaseSequencePreparedMapping(PreparedMapping):
     """
 
     def __setitem__(self, key, value):
-        # FIXME validate key being a valid URL template
-        # FIXME this needs to be co-ordinated with the endpoint mapping
-        # implementation.
         if key not in self:
             result = []
             # using the base mapping directly as the semantics of how
@@ -228,7 +225,6 @@ class BaseSequencePreparedMapping(PreparedMapping):
         else:
             result = self.get(key)
 
-        # TODO use the appropriate ResourceDefinition constructor
         if isinstance(value, Sequence):
             result.clear()
             for item in value:
@@ -237,21 +233,19 @@ class BaseSequencePreparedMapping(PreparedMapping):
             result.append(self.prepare_from_value(value))
 
 
-class ResourceDefinitionMapping(BaseSequencePreparedMapping):
+class BaseResourceDefinitionMapping(BasePreparedMapping):
     """
-    A resource definition mapping is a mapping with keys that reference
-    some path fragment of some URI, and the value assigned being a dict
-    being a mapping of arguments to the function being called, and the
-    function being called be specified with either the __init__ or the
-    __call__ key, plus a __name__ which the return value will be
-    assigned to.  Only one of __init__ or __call__ may be specified;
-    The __init__ key must reference some valid entry point within the
-    environment, while the __call__ key must reference an existing value
-    in the environment that will be invoked.
+    This defines the base resource definition mapping, where the value
+    assigned should be a dict, or a a mapping of arguments to the
+    function being called.  They must be specified with either the
+    __init__ or the __call__ key, plus a __name__ which the return value
+    will be assigned to.  Only one of __init__ or __call__ may be
+    specified; The __init__ key must reference some valid entry point
+    within the environment, while the __call__ key must reference an
+    existing value in the environment that will be invoked.
 
-    Another notable difference with this mapping is that each key must
-    have multiple values presented in an ordered list, as there can be
-    multiple resources defined for each end point.
+    This base class makes no assumption as to how the assignment and/or
+    retrieval should proceed.
     """
 
     class ResourceDefinition(object):
@@ -319,6 +313,25 @@ class ResourceDefinitionMapping(BaseSequencePreparedMapping):
         call = kwargs.pop('__call__', None)
         init = kwargs.pop('__init__', None)
         return cls.create_resource_definition(name, call, init, kwargs)
+
+
+class ResourceDefinitionMapping(
+        BaseResourceDefinitionMapping, SequencePreparedMapping):
+    """
+    A resource definition mapping is a mapping with keys that reference
+    some path fragment of some URI, and the value assigned being a dict
+    being a mapping of arguments to the function being called, and the
+    function being called be specified with either the __init__ or the
+    __call__ key, plus a __name__ which the return value will be
+    assigned to.  Only one of __init__ or __call__ may be specified;
+    The __init__ key must reference some valid entry point within the
+    environment, while the __call__ key must reference an existing value
+    in the environment that will be invoked.
+
+    Another notable difference with this mapping is that each key must
+    have multiple values presented in an ordered list, as there can be
+    multiple resources defined for each end point.
+    """
 
 
 class ObjectInstantiationMapping(PreparedMapping):

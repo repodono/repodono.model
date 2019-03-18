@@ -676,3 +676,58 @@ class RouteTrieMappingTestCase(unittest.TestCase):
         self.assertEqual([
             ('/w/{root}', ['c', 'd']),
         ], rt_map['/w/{root}'])
+
+    def test_resource_map_conversion(self):
+        # Ensure that the resource definition mapping, a class designed
+        # to be compatible with the deserializer, be convertable to the
+        # specific and specialized mapping class that can be used in the
+        # context of routing.
+
+        # While this _can_ be done as a unified class, there are two
+        # separate concerns here so it would be best to keep both of
+        # these as two distinct classes, with the form that is generated
+        # from a direct loading into one that is internal usage.
+
+        mapping = ResourceDefinitionMapping({
+            '/browse/{id}': [{
+                '__name__': 'name1',
+                '__call__': 'a_function',
+                'arg1': 'reference1',
+            }, {
+                '__name__': 'name2',
+                '__init__': 'repodono.model.testing:Thing',
+                'path': 'a_path',  # references a_path
+            }, {
+                '__name__': 'name3',
+                '__init__': 'repodono.model.testing:Thing',
+                'path': 'name1',  # references name1, defined here
+            }],
+            '/browse/{id}/{mode}': [{
+                '__name__': 'use_id',
+                '__init__': 'repodono.model.testing:Thing',
+                'path': 'id',  # references a_path
+            }, {
+                '__name__': 'use_mode',
+                '__init__': 'repodono.model.testing:Thing',
+                'path': 'mode',  # references name1, defined here
+            }],
+        })
+
+        rt_map = RouteTrieMapping(mapping)
+
+        level2 = rt_map['/browse/{id}/{mode}']
+        level1 = rt_map['/browse/{id}']
+        self.assertEqual(2, len(level2))
+        self.assertEqual(1, len(level1))
+
+        # the idea is that there will need to be another layer, probably
+        # subclassed from FlatGroupedMapping, that take the returned
+        # list of mappings and formalize that as a group that can be
+        # retrived.  Then another layer on top of that that combines
+        # with a mapping formed from the incoming values extracted from
+        # a url with this one that will have something similar to the
+        # ObjectInstantiationMapping where it will instead use itself
+        # to provide the mapping of values, and its __getitem__ will
+        # instantiate the target ResourceDefinition entry.  Somehow this
+        # result should also be cached somewhere, perhaps in a thread
+        # local store.

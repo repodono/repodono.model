@@ -233,6 +233,13 @@ class SequencePreparedMapping(PreparedMapping):
             result.append(self.prepare_from_value(value))
 
 
+class BaseResourceDefinition(object):
+    """
+    The BaseResourceDefinition class.  More of a marker/common ancestor
+    for all ResourceDefinition types.
+    """
+
+
 class BaseResourceDefinitionMapping(BasePreparedMapping):
     """
     This defines the base resource definition mapping, where the value
@@ -248,7 +255,7 @@ class BaseResourceDefinitionMapping(BasePreparedMapping):
     retrieval should proceed.
     """
 
-    class ResourceDefinition(object):
+    class ResourceDefinition(BaseResourceDefinition):
         def __init__(self, name, call, kwargs):
             self.name = name
             self.call = call
@@ -313,6 +320,10 @@ class BaseResourceDefinitionMapping(BasePreparedMapping):
         call = kwargs.pop('__call__', None)
         init = kwargs.pop('__init__', None)
         return cls.create_resource_definition(name, call, init, kwargs)
+
+    # one possible way for subclass to do a lazy load of the definition
+    # during access is to override __getitem__ and apply self to kwargs
+    # so that it would instantiate via values provided by itself.
 
 
 class ResourceDefinitionMapping(

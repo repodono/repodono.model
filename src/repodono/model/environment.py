@@ -37,5 +37,5 @@ class Resource(StructuredMapping((
     Default resource mapping implementation
 
     [[Resource]]
-    resource = "repodono.model.base:BaseMapping"
+    resource = "repodono.model.base:ResourceDefinitionMapping"
     """

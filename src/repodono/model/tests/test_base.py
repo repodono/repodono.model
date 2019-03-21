@@ -4,8 +4,11 @@ from ast import literal_eval
 from repodono.model.base import (
     BaseMapping,
     BasePreparedMapping,
+    BaseResourceDefinition,
     PreparedMapping,
+    CompiledRouteResourceDefinitionMapping,
     DeferredPreparedMapping,
+    ExecutionEnvironment,
     FlatGroupedMapping,
     ObjectInstantiationMapping,
     ResourceDefinitionMapping,
@@ -306,6 +309,41 @@ class ObjectInstantiationMappingTestCase(unittest.TestCase):
         }}, value)
         self.assertTrue(isinstance(result['target'], Thing))
         self.assertEqual(result['target'].path, marker)
+
+
+class BaseResourceDefinitionTestCase(unittest.TestCase):
+
+    def test_construction_and_usage(self):
+        missing = BaseResourceDefinition(name='missing', call=Thing, kwargs={})
+        full = BaseResourceDefinition(name='full', call=Thing, kwargs={
+            'path': 'path_key',
+        })
+
+        partial_m = missing(vars_={})
+        partial_f = full(vars_={'path_key': 'the_path'})
+
+        with self.assertRaises(TypeError):
+            # missing argument path
+            partial_m()
+
+        inst_m = partial_m(path='m')
+        inst_f = partial_f()
+        inst_f_reassign = partial_f(path='hi')
+
+        self.assertEqual(inst_m.path, 'm')
+        self.assertEqual(inst_f.path, 'the_path')
+        self.assertEqual(inst_f_reassign.path, 'hi')
+
+    def test_usage_in_mapping(self):
+        key1 = BaseResourceDefinition(name='key1', call=Thing, kwargs={})
+        key2 = BaseResourceDefinition(name='key2', call=Thing, kwargs={})
+        values = [key1, key2, ('key3', 'other')]
+        mapping = dict(values)
+        # automatically be usable as part of a cast as part of an item
+        # in a list to a mapping under the key provided by name.
+        self.assertIs(mapping['key1'], key1)
+        self.assertIs(mapping['key2'], key2)
+        self.assertIs(mapping['key3'], 'other')
 
 
 class ResourceDefinitionMappingTestCase(unittest.TestCase):
@@ -731,3 +769,89 @@ class RouteTrieMappingTestCase(unittest.TestCase):
         # instantiate the target ResourceDefinition entry.  Somehow this
         # result should also be cached somewhere, perhaps in a thread
         # local store.
+
+
+class CompiledRRDTestCase(unittest.TestCase):
+
+    def test_resource_map_conversion(self):
+        rd_map = ResourceDefinitionMapping({
+            '/browse/{id}': [{
+                '__name__': 'name1',
+                '__call__': 'a_function',
+                'arg1': 'reference1',
+            }, {
+                '__name__': 'name2',
+                '__init__': 'repodono.model.testing:Thing',
+                'path': 'a_path',  # references a_path
+            }, {
+                '__name__': 'name3',
+                '__init__': 'repodono.model.testing:Thing',
+                'path': 'name1',  # references name1, defined here
+            }],
+            '/browse/{id}/{mode}': [{
+                '__name__': 'use_id',
+                '__init__': 'repodono.model.testing:Thing',
+                'path': 'id',  # references a_path
+            }, {
+                '__name__': 'use_mode',
+                '__init__': 'repodono.model.testing:Thing',
+                'path': 'mode',  # references name1, defined here
+            }],
+        })
+        rt_map = RouteTrieMapping(rd_map)
+        crrd_map = CompiledRouteResourceDefinitionMapping(rt_map)
+
+        self.assertEqual(2, len(crrd_map))
+        self.assertEqual(3, len(crrd_map['/browse/{id}']))
+        self.assertEqual(5, len(crrd_map['/browse/{id}/{mode}']))
+
+        browse_id = crrd_map['/browse/{id}']
+        browse_id_mode = crrd_map['/browse/{id}/{mode}']
+        self.assertIs(browse_id['name1'], browse_id_mode['name1'])
+        self.assertEqual(browse_id['name1'].kwargs, {
+            'arg1': 'reference1',
+        })
+        self.assertEqual(browse_id_mode['use_id'].kwargs, {
+            'path': 'id',
+        })
+
+
+class ExecutionEnvironmentTestCase(unittest.TestCase):
+
+    def test_execution_environment_usage(self):
+        rd_map = ResourceDefinitionMapping({
+            '/browse/{id}': [{
+                '__name__': 'name1',
+                '__call__': 'a_function',
+                'arg1': 'reference1',
+            }, {
+                '__name__': 'name2',
+                '__init__': 'repodono.model.testing:Thing',
+                'path': 'a_path',  # references a_path
+            }, {
+                '__name__': 'name3',
+                '__init__': 'repodono.model.testing:Thing',
+                'path': 'name1',  # references name1, defined here
+            }],
+            '/browse/{id}/{mode}': [{
+                '__name__': 'use_id',
+                '__init__': 'repodono.model.testing:Thing',
+                'path': 'id',  # references a_path
+            }, {
+                '__name__': 'use_mode',
+                '__init__': 'repodono.model.testing:Thing',
+                'path': 'mode',  # references name1, defined here
+            }],
+        })
+        rt_map = RouteTrieMapping(rd_map)
+        crrd_map = CompiledRouteResourceDefinitionMapping(rt_map)
+
+        # /browse/the_id/the_mode
+        exeenv = ExecutionEnvironment([
+            crrd_map['/browse/{id}/{mode}'],
+            {
+                'id': 'the_id',
+                'mode': 'the_mode',
+            },
+        ])
+        self.assertEqual(exeenv['use_mode'].path, 'the_mode')

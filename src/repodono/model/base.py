@@ -90,6 +90,9 @@ class BaseMapping(MutableMapping):
     def __repr__(self):
         return repr(self.__map)
 
+    # TODO
+    # implement from_json / from_toml class constructors?
+
 
 class FlatGroupedMapping(BaseMapping):
     """
@@ -239,6 +242,33 @@ class BaseResourceDefinition(object):
     for all ResourceDefinition types.
     """
 
+    def __init__(self, name, call, kwargs):
+        self.name = name
+        self.call = call
+        self.kwargs = kwargs
+
+    def __iter__(self):
+        yield self.name
+        yield self
+
+    def __call__(self, vars_, **kwargs):
+        """
+        Prepares a callable object that can be invoked immediately
+        with the required definitions.
+        """
+
+        call = (
+            self.call if callable(self.call) else
+            map_vars_value(self.call, vars_)
+        )
+        kwargs.update(map_vars_value(self.kwargs, vars_))
+        # XXX this does NOT actually trigger the assignment to
+        # vars_[self.name], as the current definition on how the
+        # protocol works is not yet defined; it may be possible to
+        # encapsulate the Environment in a submapping representing
+        # some RuntimeEnvironment for the actual usage.
+        return partial(call, **kwargs)
+
 
 class BaseResourceDefinitionMapping(BasePreparedMapping):
     """
@@ -256,10 +286,6 @@ class BaseResourceDefinitionMapping(BasePreparedMapping):
     """
 
     class ResourceDefinition(BaseResourceDefinition):
-        def __init__(self, name, call, kwargs):
-            self.name = name
-            self.call = call
-            self.kwargs = kwargs
 
         @classmethod
         def from_call(cls, name, call, kwargs):
@@ -275,24 +301,6 @@ class BaseResourceDefinitionMapping(BasePreparedMapping):
             return cls(name=name, call=call, kwargs=kwargs)
 
         # TODO vars_ as an argument determine if sane?
-
-        def __call__(self, vars_, **kwargs):
-            """
-            Prepares a callable object that can be invoked immediately
-            with the required definitions.
-            """
-
-            call = (
-                self.call if callable(self.call) else
-                map_vars_value(self.call, vars_)
-            )
-            kwargs.update(map_vars_value(self.kwargs, vars_))
-            # XXX this does NOT actually trigger the assignment to
-            # vars_[self.name], as the current definition on how the
-            # protocol works is not yet defined; it may be possible to
-            # encapsulate the Environment in a submapping representing
-            # some RuntimeEnvironment for the actual usage.
-            return partial(call, **kwargs)
 
     @classmethod
     def create_resource_definition(cls, name, call, init, kwargs):
@@ -374,6 +382,7 @@ class ObjectInstantiationMapping(PreparedMapping):
         super().__init__(items)
 
     def prepare_from_value(self, value):
+        # TODO if value is of a BaseResourceDefinition...
         kwargs = dict(value)
         entry = EntryPoint.parse('target=' + kwargs.pop('__init__'))
         target = entry.resolve()
@@ -505,3 +514,45 @@ class RouteTrieMapping(MutableMapping):
 
     def __repr__(self):
         return repr(self.__map)
+
+
+class CompiledRouteResourceDefinitionMapping(BaseMapping):
+    """
+    An instance of RouteTrieMapping should be provided for conversion.
+    """
+
+    def process_value(self, value):
+        return [dict(v) for k, v in value]
+
+    def check_mappings(self, key, value):
+        """
+        Subclass could implement the specific strategy for validation.
+        """
+
+    def build_item(self, key, value):
+        mappings = self.process_value(value)
+        self.check_mappings(key, mappings)
+        # this base type does not do any checking.
+        return key, FlatGroupedMapping(mappings)
+
+    def __setitem__(self, key, value):
+        super().__setitem__(*self.build_item(key, value))
+
+
+class ExecutionEnvironment(FlatGroupedMapping):
+    """
+    This should be constructed from a FlatGroupedMapping that has
+    grouped all the relevant resource definitions mapping defined for
+    the current endpoint plus the extracted values from the route.  The
+    __getitem__ method will automatically instantiate all resource
+    definitions using values provided by itself.
+    """
+
+    def __getitem__(self, key):
+        # TODO use some kind of threadlocal to track keys retrieved?
+        # TODO static version?
+        value = super().__getitem__(key)
+        if isinstance(value, BaseResourceDefinition):
+            return value(vars_=self)()
+        else:
+            return value

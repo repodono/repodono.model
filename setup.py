@@ -40,6 +40,12 @@ setup(
         'uritemplate',
     ],
     extras_require={
+        'flask': [
+            'flask',
+        ],
+        'sanic': [
+            'sanic',
+        ],
     },
     python_requires='>=3.6',
     entry_points={

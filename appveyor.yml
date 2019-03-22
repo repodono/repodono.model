@@ -8,7 +8,7 @@ install:
   - "%PYTHON%\\python.exe -m virtualenv env"
   - "env\\Scripts\\activate"
   - "pip install -U coverage"
-  - "pip install -e ."
+  - "pip install -e .[sanic,flask]"
 
 test_script:
   # piping empty echo to disable the tty test which is reported as

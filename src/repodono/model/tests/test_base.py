@@ -8,7 +8,7 @@ from repodono.model.base import (
     PreparedMapping,
     CompiledRouteResourceDefinitionMapping,
     DeferredPreparedMapping,
-    ExecutionEnvironment,
+    ExecutionLocals,
     FlatGroupedMapping,
     ObjectInstantiationMapping,
     ResourceDefinitionMapping,
@@ -816,7 +816,7 @@ class CompiledRRDTestCase(unittest.TestCase):
         })
 
 
-class ExecutionEnvironmentTestCase(unittest.TestCase):
+class ExecutionLocalsTestCase(unittest.TestCase):
 
     def test_execution_environment_usage(self):
         rd_map = ResourceDefinitionMapping({
@@ -847,11 +847,11 @@ class ExecutionEnvironmentTestCase(unittest.TestCase):
         crrd_map = CompiledRouteResourceDefinitionMapping(rt_map)
 
         # /browse/the_id/the_mode
-        exeenv = ExecutionEnvironment([
+        exec_locals = ExecutionLocals([
             crrd_map['/browse/{id}/{mode}'],
             {
                 'id': 'the_id',
                 'mode': 'the_mode',
             },
         ])
-        self.assertEqual(exeenv['use_mode'].path, 'the_mode')
+        self.assertEqual(exec_locals['use_mode'].path, 'the_mode')

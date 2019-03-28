@@ -539,7 +539,7 @@ class CompiledRouteResourceDefinitionMapping(BaseMapping):
         super().__setitem__(*self.build_item(key, value))
 
 
-class ExecutionEnvironment(FlatGroupedMapping):
+class ExecutionLocals(FlatGroupedMapping):
     """
     This should be constructed from a FlatGroupedMapping that has
     grouped all the relevant resource definitions mapping defined for

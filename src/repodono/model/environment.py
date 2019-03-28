@@ -1,9 +1,16 @@
+"""
+Defines the classes that encapsulate the resources that can be loaded
+from a provided configuration.
+"""
+
 from repodono.model.base import (
     StructuredMapping,
     BaseMapping,
     PathMapping,
     ObjectInstantiationMapping,
     ResourceDefinitionMapping,
+    RouteTrieMapping,
+    CompiledRouteResourceDefinitionMapping,
 )
 
 
@@ -31,7 +38,8 @@ class Environment(StructuredMapping((
 
 
 class Resource(StructuredMapping((
-    ('resource', ResourceDefinitionMapping),
+    ('resource', lambda x: CompiledRouteResourceDefinitionMapping(
+        RouteTrieMapping(ResourceDefinitionMapping(x)))),
 ))):
     """
     Default resource mapping implementation

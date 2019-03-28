@@ -138,4 +138,4 @@ class ResourceTestCase(unittest.TestCase):
         path = "root_path"
         """ % (root.name,))
         resource = Resource(config)
-        self.assertEqual(resource['/entry/{entry_id}'][0].name, 'blog_entry')
+        self.assertIn('blog_entry', resource['/entry/{entry_id}'])

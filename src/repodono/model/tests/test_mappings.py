@@ -3,19 +3,8 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 
 from repodono.model.config import Configuration
-from repodono.model.environment import Environment
-from repodono.model.environment import Resource
-
-"""
-[environment.variables]  # strings??
-# fs_root is a reference to some filesystem location that may be
-# served, perhaps separating these things out to own section?
-exposure_root = "https://example.com/e"
-
-[environment.paths]
-git_checkout_root = "/tmp/data/pmrdemo"
-generated_root = "/tmp/data/pmrdata"
-"""
+from repodono.model.mappings import Environment
+from repodono.model.mappings import Resource
 
 
 class EnvironmentTestCase(unittest.TestCase):

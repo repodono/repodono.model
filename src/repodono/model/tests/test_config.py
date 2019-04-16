@@ -11,5 +11,5 @@ class ConfigTestCase(unittest.TestCase):
         foo = 'bar'
         """
 
-        config = Configuration(config_str)
+        config = Configuration.from_toml(config_str)
         self.assertEqual(config['environment']['variables']['foo'], 'bar')

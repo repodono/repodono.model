@@ -10,7 +10,7 @@ from repodono.model.mappings import Resource
 class EnvironmentTestCase(unittest.TestCase):
 
     def test_base_environment_variables(self):
-        config = Configuration("""
+        config = Configuration.from_toml("""
         [environment.variables]
         foo = "bar"
         """)
@@ -20,7 +20,7 @@ class EnvironmentTestCase(unittest.TestCase):
     def test_paths(self):
         root = TemporaryDirectory()
         self.addCleanup(root.cleanup)
-        config = Configuration("""
+        config = Configuration.from_toml("""
         [environment.variables]
         foo = "bar"
         [environment.paths]
@@ -33,7 +33,7 @@ class EnvironmentTestCase(unittest.TestCase):
     def test_objects(self):
         root = TemporaryDirectory()
         self.addCleanup(root.cleanup)
-        config = Configuration("""
+        config = Configuration.from_toml("""
         [environment.variables]
         foo = "bar"
         [environment.paths]
@@ -49,7 +49,7 @@ class EnvironmentTestCase(unittest.TestCase):
     def test_list_items_resolved(self):
         root = TemporaryDirectory()
         self.addCleanup(root.cleanup)
-        config = Configuration("""
+        config = Configuration.from_toml("""
         [environment.variables]
         text = "hello"
         number = 0
@@ -69,7 +69,7 @@ class EnvironmentTestCase(unittest.TestCase):
     def test_list_nested_list_resolved(self):
         root = TemporaryDirectory()
         self.addCleanup(root.cleanup)
-        config = Configuration("""
+        config = Configuration.from_toml("""
         [environment.variables]
         greeting = "hello"
         farewell = "goodbye"
@@ -91,7 +91,7 @@ class EnvironmentTestCase(unittest.TestCase):
     def test_dict_items_resolved(self):
         root = TemporaryDirectory()
         self.addCleanup(root.cleanup)
-        config = Configuration("""
+        config = Configuration.from_toml("""
         [environment.variables]
         text = "hello"
         number = 0
@@ -118,7 +118,7 @@ class ResourceTestCase(unittest.TestCase):
     def test_basic_resource(self):
         root = TemporaryDirectory()
         self.addCleanup(root.cleanup)
-        config = Configuration("""
+        config = Configuration.from_toml("""
         [environment.paths]
         root_path = %r
         [[resource."/entry/{entry_id}"]]

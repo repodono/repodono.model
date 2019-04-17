@@ -3,19 +3,16 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 
 from repodono.model.config import Configuration
-from repodono.model.mappings import Environment
-from repodono.model.mappings import Resource
 
 
-class EnvironmentTestCase(unittest.TestCase):
+class ConfigEnvironmentTestCase(unittest.TestCase):
 
     def test_base_environment_variables(self):
         config = Configuration.from_toml("""
         [environment.variables]
         foo = "bar"
         """)
-        base_environment = Environment(config)
-        self.assertEqual(base_environment['foo'], 'bar')
+        self.assertEqual(config.environment['foo'], 'bar')
 
     def test_paths(self):
         root = TemporaryDirectory()
@@ -26,9 +23,8 @@ class EnvironmentTestCase(unittest.TestCase):
         [environment.paths]
         base_root = %r
         """ % (root.name,))
-        base_environment = Environment(config)
-        self.assertEqual(base_environment['foo'], 'bar')
-        self.assertTrue(isinstance(base_environment['base_root'], Path))
+        self.assertEqual(config.environment['foo'], 'bar')
+        self.assertTrue(isinstance(config.environment['base_root'], Path))
 
     def test_objects(self):
         root = TemporaryDirectory()
@@ -43,8 +39,7 @@ class EnvironmentTestCase(unittest.TestCase):
         __init__ = "repodono.model.testing:Thing"
         path = "base_root"
         """ % (root.name,))
-        base_environment = Environment(config)
-        self.assertTrue(isinstance(base_environment['thing'].path, Path))
+        self.assertTrue(isinstance(config.environment['thing'].path, Path))
 
     def test_list_items_resolved(self):
         root = TemporaryDirectory()
@@ -60,7 +55,7 @@ class EnvironmentTestCase(unittest.TestCase):
         __init__ = "repodono.model.testing:Thing"
         path = ["text", "number", "base_root"]
         """ % (root.name,))
-        env = Environment(config)
+        env = config.environment
         self.assertEqual(
             [env['text'], env['number'], env['base_root']],
             env['thing'].path,
@@ -81,7 +76,7 @@ class EnvironmentTestCase(unittest.TestCase):
         __init__ = "repodono.model.testing:Thing"
         path = [ ["greeting", "farewell"], ["number",], ["base_root",],]
         """ % (root.name,))
-        env = Environment(config)
+        env = config.environment
         self.assertEqual([
             ['hello', 'goodbye'],
             [0],
@@ -105,7 +100,7 @@ class EnvironmentTestCase(unittest.TestCase):
         number = "number"
         texts = ["text", "text"]
         """ % (root.name,))
-        env = Environment(config)
+        env = config.environment
         self.assertEqual({
             'path': env['base_root'],
             'number': 0,
@@ -113,7 +108,7 @@ class EnvironmentTestCase(unittest.TestCase):
         }, env['thing'].path)
 
 
-class ResourceTestCase(unittest.TestCase):
+class ConfigResourceTestCase(unittest.TestCase):
 
     def test_basic_resource(self):
         root = TemporaryDirectory()
@@ -126,5 +121,4 @@ class ResourceTestCase(unittest.TestCase):
         __init__ = "repodono.model.testing:Thing"
         path = "root_path"
         """ % (root.name,))
-        resource = Resource(config)
-        self.assertIn('blog_entry', resource['/entry/{entry_id}'])
+        self.assertIn('blog_entry', config.resource['/entry/{entry_id}'])

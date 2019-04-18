@@ -5,18 +5,6 @@ from tempfile import TemporaryDirectory
 from repodono.model.config import Configuration
 
 
-class ConfigTestCase(unittest.TestCase):
-
-    def test_base(self):
-        config_str = """
-        [environment.variables]
-        foo = 'bar'
-        """
-
-        config = Configuration.from_toml(config_str)
-        self.assertEqual(config['environment']['variables']['foo'], 'bar')
-
-
 class ConfigEnvironmentTestCase(unittest.TestCase):
 
     def test_base_environment_variables(self):
@@ -161,3 +149,59 @@ class ConfigEndpointTestCase(unittest.TestCase):
             "item": 2,
             "target": "json",
         }, config.endpoint['json']['/entry/{entry_id}'].environment)
+
+
+class ConfigIntegrationTestCase(unittest.TestCase):
+
+    def test_base(self):
+        config_str = """
+        [environment.variables]
+        foo = 'bar'
+        """
+
+        config = Configuration.from_toml(config_str)
+        self.assertEqual(config['environment']['variables']['foo'], 'bar')
+
+    def test_compiled_details(self):
+        root = TemporaryDirectory()
+        self.addCleanup(root.cleanup)
+        config = Configuration.from_toml("""
+        [environment.variables]
+        foo = "bar"
+
+        [environment.paths]
+        base_root = %r
+
+        [[environment.objects]]
+        __name__ = "thing"
+        __init__ = "repodono.model.testing:Thing"
+        path = "base_root"
+
+        [[resource."/entry/{entry_id}"]]
+        __name__ = "env_poker"
+        __init__ = "repodono.model.testing:Thing"
+        path = "thing"
+
+        [[resource."/entry/{entry_id}"]]
+        __name__ = "entry_viewer"
+        __init__ = "repodono.model.testing:Thing"
+        path = "entry_id"
+
+        [endpoint._."/entry/{entry_id}"]
+        __handler__ = "blog_entry"
+
+        [endpoint._."/entry/{entry_id}/details"]
+        __handler__ = "blog_entry_details"
+        """ % (root.name,))
+
+        exe_locals = config.execution_locals_from_route_mapping(
+            '/entry/{entry_id}/details', {'entry_id': '123'})
+
+        self.assertEqual(exe_locals['entry_viewer'].path, '123')
+        self.assertEqual(
+            # first path reference the "thing" environment.object
+            # second path reference the "base_root" in environment.paths
+            str(exe_locals['env_poker'].path.path),
+            # the TemporaryDirectory.name
+            root.name
+        )

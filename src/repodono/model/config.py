@@ -57,8 +57,19 @@ class Configuration(BaseConfiguration):
         Compile the configuration into the form that may be used.
         """
 
+        self.endpoint_keys = set()
+        for endpoint_definition in self.endpoint.values():
+            self.endpoint_keys.update(endpoint_definition.keys())
+
+        rtres = RouteTrieMapping(self.resource)
+        for endpoints in self.endpoint_keys:
+            # using setdefault to assign an empty list for endpoints
+            # that do not already have a correlated set of resources
+            # defined.
+            rtres.setdefault(endpoints, [])
+
         self.compiled_route_resources = CompiledRouteResourceDefinitionMapping(
-            RouteTrieMapping(self.resource))
+            rtres)
 
     def execution_locals_from_route_mapping(self, route, mapping):
         """

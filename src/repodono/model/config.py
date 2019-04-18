@@ -85,4 +85,9 @@ class Configuration(BaseConfiguration):
         """
 
         resources = self.compiled_route_resources[route]  # raises KeyError
-        return ExecutionLocals([self.environment, resources, dict(mapping)])
+        # TODO figure out how to "execute" the endpoint
+        # TODO how to actually figure out which "profile" to use
+        # XXX the usage of '_' is hardcoded.
+        endpoint = self.endpoint['_'][route]
+        return ExecutionLocals([
+            endpoint.environment, self.environment, resources, dict(mapping)])

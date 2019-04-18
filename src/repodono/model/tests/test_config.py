@@ -189,19 +189,33 @@ class ConfigIntegrationTestCase(unittest.TestCase):
 
         [endpoint._."/entry/{entry_id}"]
         __handler__ = "blog_entry"
+        details = false
 
         [endpoint._."/entry/{entry_id}/details"]
         __handler__ = "blog_entry_details"
+        details = true
         """ % (root.name,))
 
-        exe_locals = config.execution_locals_from_route_mapping(
-            '/entry/{entry_id}/details', {'entry_id': '123'})
-
-        self.assertEqual(exe_locals['entry_viewer'].path, '123')
+        top_locals = config.execution_locals_from_route_mapping(
+            '/entry/{entry_id}', {'entry_id': '123'})
+        self.assertEqual(top_locals['entry_viewer'].path, '123')
         self.assertEqual(
             # first path reference the "thing" environment.object
             # second path reference the "base_root" in environment.paths
-            str(exe_locals['env_poker'].path.path),
+            str(top_locals['env_poker'].path.path),
             # the TemporaryDirectory.name
             root.name
         )
+        self.assertFalse(top_locals['details'])
+
+        details_locals = config.execution_locals_from_route_mapping(
+            '/entry/{entry_id}/details', {'entry_id': '123'})
+        self.assertEqual(details_locals['entry_viewer'].path, '123')
+        self.assertEqual(
+            # first path reference the "thing" environment.object
+            # second path reference the "base_root" in environment.paths
+            str(details_locals['env_poker'].path.path),
+            # the TemporaryDirectory.name
+            root.name
+        )
+        self.assertTrue(details_locals['details'])

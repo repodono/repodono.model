@@ -10,8 +10,6 @@ from repodono.model.base import (
     ObjectInstantiationMapping,
     ResourceDefinitionMapping,
     EndpointDefinitionSetMapping,
-    RouteTrieMapping,
-    CompiledRouteResourceDefinitionMapping,
 )
 
 
@@ -39,8 +37,7 @@ class Environment(StructuredMapping((
 
 
 class Resource(StructuredMapping((
-    ('resource', lambda x: CompiledRouteResourceDefinitionMapping(
-        RouteTrieMapping(ResourceDefinitionMapping(x)))),
+    ('resource', ResourceDefinitionMapping),
 ))):
     """
     Default resource mapping implementation

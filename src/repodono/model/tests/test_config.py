@@ -133,7 +133,9 @@ class ConfigResourceTestCase(unittest.TestCase):
         __init__ = "repodono.model.testing:Thing"
         path = "root_path"
         """ % (root.name,))
-        self.assertIn('blog_entry', config.resource['/entry/{entry_id}'])
+        self.assertEqual(1, len(config.resource['/entry/{entry_id}']))
+        self.assertIn('blog_entry', config.compiled_route_resources[
+            '/entry/{entry_id}'])
 
 
 class ConfigEndpointTestCase(unittest.TestCase):

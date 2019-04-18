@@ -3,11 +3,18 @@ The confiration classes for the repodono framework.
 """
 
 import toml
-from repodono.model.base import BaseMapping
-from repodono.model.base import ExecutionLocals
-from repodono.model.mappings import Environment
-from repodono.model.mappings import Resource
-from repodono.model.mappings import Endpoint
+
+from repodono.model.base import (
+    BaseMapping,
+    ExecutionLocals,
+    RouteTrieMapping,
+    CompiledRouteResourceDefinitionMapping,
+)
+from repodono.model.mappings import (
+    Environment,
+    Resource,
+    Endpoint,
+)
 
 
 # Perhaps this could be another class in the base module?
@@ -43,6 +50,15 @@ class Configuration(BaseConfiguration):
         self.environment = Environment(self)
         self.resource = Resource(self)
         self.endpoint = Endpoint(self)
+        self.compile()
+
+    def compile(self):
+        """
+        Compile the configuration into the form that may be used.
+        """
+
+        self.compiled_route_resources = CompiledRouteResourceDefinitionMapping(
+            RouteTrieMapping(self.resource))
 
     def execution_locals_from_route_mapping(self, route, mapping):
         """
@@ -57,5 +73,5 @@ class Configuration(BaseConfiguration):
             the mapping extracted from the url.
         """
 
-        resources = self.resource[route]  # raises KeyError
+        resources = self.compiled_route_resources[route]  # raises KeyError
         return ExecutionLocals([self.environment, resources, dict(mapping)])

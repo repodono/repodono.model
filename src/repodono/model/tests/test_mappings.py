@@ -56,8 +56,7 @@ class MappingsTestCase(unittest.TestCase):
             },
         })
 
-        self.assertIn('thing1', resource['/entry/{entry_id}'])
-        self.assertIn('thing2', resource['/entry/{entry_id}'])
+        self.assertEqual(2, len(resource['/entry/{entry_id}']))
 
     def test_endpoint(self):
         endpoint = mappings.Endpoint({

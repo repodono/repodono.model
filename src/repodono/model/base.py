@@ -353,6 +353,78 @@ class ResourceDefinitionMapping(
     """
 
 
+class BaseEndpointDefinition(object):
+    """
+    The BaseEndpointDefinition class.  More of a marker/common ancestor
+    for all EndpointDefinition types.
+    """
+
+    def __init__(self, handler, root, environment):
+        self.handler = handler
+        self.root = root
+        self.environment = environment
+
+
+class BaseEndpointDefinitionMapping(BasePreparedMapping):
+    """
+    This defines the base endpoint definition mapping, where the value
+    assigned should be a dict, or a a mapping of arguments to the
+    function being called.  They must be specified with both the
+    __handler__ and the __root__ key.
+
+    This base class makes no assumption as to how the assignment and/or
+    retrieval should proceed.
+    """
+
+    # internal class structure similar to the resource definition
+    # version for the mean time.
+
+    class EndpointDefinition(BaseEndpointDefinition):
+        pass
+
+    @classmethod
+    def create_endpoint_definition(cls, handler, root, environment):
+        return cls.EndpointDefinition(handler, root, environment)
+
+    @classmethod
+    def prepare_from_value(cls, value):
+        environment = dict(value)
+        handler = environment.pop('__handler__', None)
+        # TODO need to verify if having the root dir omitted is to be
+        # supported.
+        root = environment.pop('__root__', None)
+
+        if not handler:
+            raise ValueError('__handler__ must be defined')
+
+        return cls.create_endpoint_definition(handler, root, environment)
+
+
+class EndpointDefinitionMapping(
+        BaseEndpointDefinitionMapping, PreparedMapping):
+    """
+    The endpoint mapping defines all available endpoints for a given
+    application instance.  It would reference a handler plus a root,
+    the handler being a reference to one of the items defined via the
+    environment or an available resource at that endpoint.  The root
+    would be the key to the root on the filesystem.
+
+    Any remaining keys will be additional environment values available
+    in the context of that endpoint.
+    """
+
+
+class EndpointDefinitionSetMapping(PreparedMapping):
+    """
+    This is for the representation of the sets of mappings across the
+    entire application for all profiles.
+    """
+
+    @classmethod
+    def prepare_from_value(self, value):
+        return EndpointDefinitionMapping(value)
+
+
 class ObjectInstantiationMapping(PreparedMapping):
     """
     This takes a list of dicts that contain the prerequisite keys and

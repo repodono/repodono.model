@@ -7,6 +7,7 @@ from repodono.model.base import BaseMapping
 from repodono.model.base import ExecutionLocals
 from repodono.model.mappings import Environment
 from repodono.model.mappings import Resource
+from repodono.model.mappings import Endpoint
 
 
 # Perhaps this could be another class in the base module?
@@ -41,6 +42,7 @@ class Configuration(BaseConfiguration):
         super().__init__(config_mapping)
         self.environment = Environment(self)
         self.resource = Resource(self)
+        self.endpoint = Endpoint(self)
 
     def execution_locals_from_route_mapping(self, route, mapping):
         """

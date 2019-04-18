@@ -9,6 +9,7 @@ from repodono.model.base import (
     PathMapping,
     ObjectInstantiationMapping,
     ResourceDefinitionMapping,
+    EndpointDefinitionSetMapping,
     RouteTrieMapping,
     CompiledRouteResourceDefinitionMapping,
 )
@@ -46,4 +47,15 @@ class Resource(StructuredMapping((
 
     [[Resource]]
     resource = "repodono.model.base:ResourceDefinitionMapping"
+    """
+
+
+class Endpoint(StructuredMapping((
+    ('endpoint', EndpointDefinitionSetMapping),
+))):
+    """
+    Default endpoint mapping implementation
+
+    [[Endpoint]]
+    endpoint = "repodono.model.base:EndpointDefinitionSetMapping"
     """

@@ -2,123 +2,75 @@ import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-from repodono.model.config import Configuration
+from repodono.model import mappings
+from repodono.model.testing import Thing
 
 
-class ConfigEnvironmentTestCase(unittest.TestCase):
+class MappingsTestCase(unittest.TestCase):
+    """
+    A rough test since the underlying implementation should have been
+    more thoroughly tested via the tests for the base classes.
 
-    def test_base_environment_variables(self):
-        config = Configuration.from_toml("""
-        [environment.variables]
-        foo = "bar"
-        """)
-        self.assertEqual(config.environment['foo'], 'bar')
+    Effectively, this kind of shows what the process might look like
+    when creating from raw python objects (or decoded JSON as they are
+    similar).
+    """
 
-    def test_paths(self):
+    def test_environment(self):
         root = TemporaryDirectory()
         self.addCleanup(root.cleanup)
-        config = Configuration.from_toml("""
-        [environment.variables]
-        foo = "bar"
-        [environment.paths]
-        base_root = %r
-        """ % (root.name,))
-        self.assertEqual(config.environment['foo'], 'bar')
-        self.assertTrue(isinstance(config.environment['base_root'], Path))
+        environment = mappings.Environment({
+            'environment': {
+                'variables': {
+                    'foo': 'bar',
+                    'bar': 'baz',
+                },
+                'paths': {
+                    'some_root': root.name,
+                },
+                'objects': [{
+                    '__name__': "thing",
+                    '__init__': "repodono.model.testing:Thing",
+                    'path': "some_root",
+                }],
+            }
+        })
 
-    def test_objects(self):
-        root = TemporaryDirectory()
-        self.addCleanup(root.cleanup)
-        config = Configuration.from_toml("""
-        [environment.variables]
-        foo = "bar"
-        [environment.paths]
-        base_root = %r
-        [[environment.objects]]
-        __name__ = "thing"
-        __init__ = "repodono.model.testing:Thing"
-        path = "base_root"
-        """ % (root.name,))
-        self.assertTrue(isinstance(config.environment['thing'].path, Path))
+        self.assertEqual(environment['foo'], 'bar')
+        self.assertEqual(environment['some_root'], Path(root.name))
+        self.assertEqual(environment['thing'].path, Path(root.name))
+        self.assertTrue(isinstance(environment['thing'], Thing))
 
-    def test_list_items_resolved(self):
-        root = TemporaryDirectory()
-        self.addCleanup(root.cleanup)
-        config = Configuration.from_toml("""
-        [environment.variables]
-        text = "hello"
-        number = 0
-        [environment.paths]
-        base_root = %r
-        [[environment.objects]]
-        __name__ = "thing"
-        __init__ = "repodono.model.testing:Thing"
-        path = ["text", "number", "base_root"]
-        """ % (root.name,))
-        env = config.environment
-        self.assertEqual(
-            [env['text'], env['number'], env['base_root']],
-            env['thing'].path,
-        )
+    def test_resource(self):
+        resource = mappings.Resource({
+            'resource': {
+                "/entry/{entry_id}": [{
+                    '__name__': 'thing1',
+                    '__init__': "repodono.model.testing:Thing",
+                    'path': 'some_other_value',
+                }, {
+                    '__name__': 'thing2',
+                    '__init__': "repodono.model.testing:Thing",
+                    'path': 'some_target',
+                }],
+            },
+        })
 
-    def test_list_nested_list_resolved(self):
-        root = TemporaryDirectory()
-        self.addCleanup(root.cleanup)
-        config = Configuration.from_toml("""
-        [environment.variables]
-        greeting = "hello"
-        farewell = "goodbye"
-        number = 0
-        [environment.paths]
-        base_root = %r
-        [[environment.objects]]
-        __name__ = "thing"
-        __init__ = "repodono.model.testing:Thing"
-        path = [ ["greeting", "farewell"], ["number",], ["base_root",],]
-        """ % (root.name,))
-        env = config.environment
-        self.assertEqual([
-            ['hello', 'goodbye'],
-            [0],
-            [env['base_root']],
-        ], env['thing'].path)
+        self.assertIn('thing1', resource['/entry/{entry_id}'])
+        self.assertIn('thing2', resource['/entry/{entry_id}'])
 
-    def test_dict_items_resolved(self):
-        root = TemporaryDirectory()
-        self.addCleanup(root.cleanup)
-        config = Configuration.from_toml("""
-        [environment.variables]
-        text = "hello"
-        number = 0
-        [environment.paths]
-        base_root = %r
-        [[environment.objects]]
-        __name__ = "thing"
-        __init__ = "repodono.model.testing:Thing"
-        [environment.objects.path]
-        path = "base_root"
-        number = "number"
-        texts = ["text", "text"]
-        """ % (root.name,))
-        env = config.environment
+    def test_endpoint(self):
+        endpoint = mappings.Endpoint({
+            'endpoint': {
+                '_': {
+                    "/entry/{entry_id}": {
+                        '__handler__': 'thing1',
+                        'path': 'some_other_value',
+                    },
+                },
+            },
+        })
+
         self.assertEqual({
-            'path': env['base_root'],
-            'number': 0,
-            'texts': ['hello', 'hello'],
-        }, env['thing'].path)
-
-
-class ConfigResourceTestCase(unittest.TestCase):
-
-    def test_basic_resource(self):
-        root = TemporaryDirectory()
-        self.addCleanup(root.cleanup)
-        config = Configuration.from_toml("""
-        [environment.paths]
-        root_path = %r
-        [[resource."/entry/{entry_id}"]]
-        __name__ = "blog_entry"
-        __init__ = "repodono.model.testing:Thing"
-        path = "root_path"
-        """ % (root.name,))
-        self.assertIn('blog_entry', config.resource['/entry/{entry_id}'])
+            'path': 'some_other_value',
+        }, endpoint['_']['/entry/{entry_id}'].environment)

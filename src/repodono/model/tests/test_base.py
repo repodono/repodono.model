@@ -12,6 +12,7 @@ from repodono.model.base import (
     FlatGroupedMapping,
     ObjectInstantiationMapping,
     ResourceDefinitionMapping,
+    EndpointDefinitionMapping,
     RouteTrieMapping,
     structured_mapper,
     StructuredMapping,
@@ -493,6 +494,49 @@ class ResourceDefinitionMappingTestCase(unittest.TestCase):
         }]
         self.assertEqual(1, len(mapping['/some/path/{id}']))
         self.assertEqual(mapping['/some/path/{id}'][0].name, 'obj3')
+
+
+class EndpointDefinitionMappingTestCase(unittest.TestCase):
+
+    def test_missing_handler(self):
+        # TODO validate exception message.
+        with self.assertRaises(ValueError):
+            EndpointDefinitionMapping({
+                '/some/path/{id}': {
+                    'key': 'some_value',
+                    'target': 'some_other_value',
+                }
+            })
+
+    def test_missing_root(self):
+        mapping = EndpointDefinitionMapping({
+            '/some/path/{id}': {
+                '__handler__': 'some_handler',
+                'key': 'some_value',
+                'target': 'some_other_value',
+            }
+        })
+        definition = mapping['/some/path/{id}']
+        # for the mean time, this would be unspecified.
+        self.assertIsNone(definition.root)
+
+    def test_basic_creation(self):
+        mapping = EndpointDefinitionMapping({
+            '/some/path/{id}': {
+                '__handler__': 'some_handler',
+                '__root__': 'some_root',
+                'key': 'some_value',
+                'target': 'some_other_value',
+            }
+        })
+        definition = mapping['/some/path/{id}']
+        # provide access to the raw keys
+        self.assertEqual(definition.handler, 'some_handler')
+        self.assertEqual(definition.root, 'some_root')
+        self.assertEqual(definition.environment, {
+            'key': 'some_value',
+            'target': 'some_other_value',
+        })
 
 
 def dump_trie(o):

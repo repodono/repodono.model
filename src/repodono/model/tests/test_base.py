@@ -12,6 +12,7 @@ from repodono.model.base import (
     FlatGroupedMapping,
     ObjectInstantiationMapping,
     ResourceDefinitionMapping,
+    BucketDefinitionMapping,
     EndpointDefinitionMapping,
     RouteTrieMapping,
     structured_mapper,
@@ -494,6 +495,35 @@ class ResourceDefinitionMappingTestCase(unittest.TestCase):
         }]
         self.assertEqual(1, len(mapping['/some/path/{id}']))
         self.assertEqual(mapping['/some/path/{id}'][0].name, 'obj3')
+
+
+class BucketDefinitionMappingTestCase(unittest.TestCase):
+
+    def test_missing_handler(self):
+        # TODO validate exception message.
+        with self.assertRaises(ValueError):
+            BucketDefinitionMapping({
+                '_': {
+                    # missing __root__
+                }
+            })
+
+    def test_basic_creation(self):
+        mapping = BucketDefinitionMapping({
+            '_': {
+                '__roots__': ['some_location'],
+                'accept': ['*/*'],
+            },
+            'json': {
+                '__roots__': ['json_location'],
+                'accept': ['application/json'],
+            },
+        })
+        self.assertEqual(mapping['_'].roots, ['some_location'])
+        self.assertEqual(mapping['_'].environment, {'accept': ['*/*']})
+        self.assertEqual(mapping['json'].roots, ['json_location'])
+        self.assertEqual(mapping['json'].environment, {
+            'accept': ['application/json']})
 
 
 class EndpointDefinitionMappingTestCase(unittest.TestCase):

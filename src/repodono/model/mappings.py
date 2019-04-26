@@ -9,6 +9,7 @@ from repodono.model.base import (
     PathMapping,
     ObjectInstantiationMapping,
     ResourceDefinitionMapping,
+    BucketDefinitionMapping,
     EndpointDefinitionSetMapping,
 )
 
@@ -33,6 +34,17 @@ class Environment(StructuredMapping((
     paths = "repodono.model.base:PathMapping"
     [[Environment.environment]]
     objects = "repodono.model.base:ObjectInstantiationMapping"
+    """
+
+
+class Bucket(StructuredMapping((
+    ('bucket', BucketDefinitionMapping,),
+))):
+    """
+    Default bucket mapping implementation
+
+    [[Bucket]]
+    bucket = "repodono.model.base:BucketDefinitionMapping"
     """
 
 

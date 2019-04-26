@@ -12,6 +12,7 @@ from repodono.model.base import (
 )
 from repodono.model.mappings import (
     Environment,
+    Bucket,
     Resource,
     Endpoint,
 )
@@ -48,6 +49,7 @@ class Configuration(BaseConfiguration):
     def __init__(self, config_mapping):
         super().__init__(config_mapping)
         self.environment = Environment(self)
+        self.bucket = Bucket(self)
         self.resource = Resource(self)
         self.endpoint = Endpoint(self)
         self.compile()

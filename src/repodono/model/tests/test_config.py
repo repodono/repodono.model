@@ -108,6 +108,37 @@ class ConfigEnvironmentTestCase(unittest.TestCase):
         }, env['thing'].path)
 
 
+class ConfigBucketTestCase(unittest.TestCase):
+
+    def test_basic_roots(self):
+        # note that the current setup captures everything.
+        config = Configuration.from_toml("""
+        [bucket._]
+        __roots__ = ["default_root", "generated_root"]
+        accept = ["*/*"]
+
+        [bucket.json]
+        __roots__ = ["json_root"]
+        accept = ["application/json", "text/json"]
+
+        [bucket.xml]
+        __roots__ = ["xml_root"]
+        accept = ["application/xml", "text/xml"]
+        """)
+
+        self.assertEqual([
+            'default_root', 'generated_root'], config.bucket['_'].roots)
+        self.assertEqual({'accept': ['*/*']}, config.bucket['_'].environment)
+        self.assertEqual(['json_root'], config.bucket['json'].roots)
+        self.assertEqual({
+            'accept': ['application/json', 'text/json']
+        }, config.bucket['json'].environment)
+        self.assertEqual(['xml_root'], config.bucket['xml'].roots)
+        self.assertEqual({
+            'accept': ['application/xml', 'text/xml']
+        }, config.bucket['xml'].environment)
+
+
 class ConfigResourceTestCase(unittest.TestCase):
 
     def test_basic_resource(self):
@@ -168,6 +199,21 @@ class ConfigIntegrationTestCase(unittest.TestCase):
         config = Configuration.from_toml("""
         [environment.variables]
         foo = "bar"
+
+        [bucket._]
+        __roots__ = ["default_root", "generated_root"]
+        accept = ["*/*"]
+
+        # Comment these out for now; will need to test whether or not a
+        # hard dependency for the end point on a bucket be required.
+        #
+        # [bucket.json]
+        # __roots__ = ["json_root"]
+        # accept = ["application/json", "text/json"]
+        #
+        # [bucket.xml]
+        # __roots__ = ["xml_root"]
+        # accept = ["application/xml", "text/xml"]
 
         [environment.paths]
         base_root = %r

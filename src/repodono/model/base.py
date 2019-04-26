@@ -353,6 +353,77 @@ class ResourceDefinitionMapping(
     """
 
 
+class BaseBucketDefinition(object):
+    """
+    The BaseBucketDefinition class.  More of a marker/common ancestor
+    for all BucketDefinition types.
+    """
+
+    def __init__(self, roots, environment):
+        """
+        Arguments
+
+        roots
+            A list of roots that the content to be served from this
+            bucket may be resolved from.
+        environment
+            Additional mapping for this bucket
+        """
+
+        self.roots = roots
+        self.environment = environment
+
+
+class BaseBucketDefinitionMapping(BasePreparedMapping):
+    """
+    This defines the base bucket definition mapping, where the value
+    assigned should be a dict, or a a mapping of arguments to the
+    function being called.  They must be specified with the __roots__
+    key.
+
+    This base class makes no assumption as to how the assignment and/or
+    retrieval should proceed.
+    """
+
+    # internal class structure similar to the resource definition
+    # version for the mean time.
+
+    class BucketDefinition(BaseBucketDefinition):
+        pass
+
+    @classmethod
+    def create_bucket_definition(cls, roots, environment):
+        return cls.BucketDefinition(roots, environment)
+
+    @classmethod
+    def prepare_from_value(cls, value):
+        environment = dict(value)
+        roots = environment.pop('__roots__', None)
+
+        if not roots:
+            raise ValueError('__roots__ must be defined')
+
+        return cls.create_bucket_definition(roots, environment)
+
+
+class BucketDefinitionMapping(
+        BaseBucketDefinitionMapping, PreparedMapping):
+    """
+    The bucket mapping defines a mapping of available buckets for this
+    system.  A bucket is a "profile" for an endpoint definition set,
+    which must have a corresponding bucket.  A bucket defines a list of
+    roots which may be resolved for statically served content, plus
+    additional keys which serves as condition for the activation of the
+    endpoint set and its associated bucket.
+
+    The set of keys that serve as the condition will be specific to the
+    runner of the application stack.  One example would be the "accept"
+    key with a list of mimetype as its value, which when provided by
+    some user-agent, would activiate this particular bucket/end point
+    set.
+    """
+
+
 class BaseEndpointDefinition(object):
     """
     The BaseEndpointDefinition class.  More of a marker/common ancestor
@@ -360,6 +431,20 @@ class BaseEndpointDefinition(object):
     """
 
     def __init__(self, handler, root, environment):
+        """
+        Arguments:
+
+        handler
+            The identifier to the handler that will handle this endpoint
+            definition.
+        root
+            The identifier to the root that the generated output
+            produced by the handler may be written to.
+        environment
+            The mapping of an environment variables specific to this
+            endpoint definition.
+        """
+
         self.handler = handler
         self.root = root
         self.environment = environment
@@ -369,8 +454,18 @@ class BaseEndpointDefinitionMapping(BasePreparedMapping):
     """
     This defines the base endpoint definition mapping, where the value
     assigned should be a dict, or a a mapping of arguments to the
-    function being called.  They must be specified with both the
-    __handler__ and the __root__ key.
+    function being called.
+
+    At the very minimum, the __handler__ key must be specified, which
+    must point to a valid reference to some callable that can be
+    resolved.
+
+    The __root__ key may be specified such that the generated data may
+    be persisted onto the filesystem.  This is independent of any of
+    the references defined inside the __roots__ key for the bucket which
+    this may represent, although typical use case will be defined to be
+    in one of them (i.e. resolving from cache such that the handler do
+    not have to be called again).
 
     This base class makes no assumption as to how the assignment and/or
     retrieval should proceed.
@@ -391,7 +486,8 @@ class BaseEndpointDefinitionMapping(BasePreparedMapping):
         environment = dict(value)
         handler = environment.pop('__handler__', None)
         # TODO need to verify if having the root dir omitted is to be
-        # supported.
+        # supported.  Currently, it may mean that the generated data may
+        # never be written?
         root = environment.pop('__root__', None)
 
         if not handler:
@@ -416,8 +512,8 @@ class EndpointDefinitionMapping(
 
 class EndpointDefinitionSetMapping(PreparedMapping):
     """
-    This is for the representation of the sets of mappings across the
-    entire application for all profiles.
+    This is for the representation of the sets of endpoint definitions
+    available for each of the defined buckets.
     """
 
     @classmethod

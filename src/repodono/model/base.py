@@ -439,6 +439,26 @@ class BucketDefinitionMapping(
     set.
     """
 
+    # TODO formalise the implementation of this through some API?
+    default_key = '_'
+
+    # TODO if the support for advanced mimetypes, a BucketDefinition
+    # that provides a more robust mimetype parsing/model of it will be
+    # beneficial.
+
+    def __call__(self, mapping):
+        """
+        As the value assigned must result in a BucketDefinition, this
+        implements a lookup function based on the provided mapping.
+        """
+
+        _ = self.default_key
+        score, key_bucket = sorted(
+            (bucket.match(mapping), (key, bucket))
+            for key, bucket in self.items()
+        )[-1]
+        return (_, self[_]) if score == 0 else key_bucket
+
 
 class BaseEndpointDefinition(object):
     """

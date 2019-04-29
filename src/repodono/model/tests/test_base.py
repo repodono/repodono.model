@@ -558,6 +558,35 @@ class BucketDefinitionMappingTestCase(unittest.TestCase):
         self.assertEqual(mapping['json'].environment, {
             'accept': ['application/json']})
 
+    def test_basic_score_matching(self):
+        mapping = BucketDefinitionMapping({
+            '_': {
+                '__roots__': ['some_location'],
+                # not going to provide a full capture as this isn't
+                # exactly implemented.
+                # 'accept': ['*/*'],
+            },
+            'json': {
+                '__roots__': ['json_location'],
+                'accept': ['text/json', 'application/json'],
+            },
+            'xml': {
+                '__roots__': ['xml_location'],
+                'accept': ['text/xml', 'application/xml'],
+            },
+        })
+        key, bucket = mapping({'accept': 'text/xml'})
+        self.assertEqual('xml', key)
+        self.assertEqual(['xml_location'], bucket.roots)
+
+        key, bucket = mapping({'accept': 'text/html'})
+        self.assertEqual('_', key)
+        self.assertEqual(['some_location'], bucket.roots)
+
+        # more generic matching of different unmatched default fallbacks.
+        self.assertEqual(
+            mapping({'accept': 'text/html'}), mapping({'accept': '*/*'}))
+
 
 class EndpointDefinitionMappingTestCase(unittest.TestCase):
 

@@ -12,6 +12,7 @@ from repodono.model.base import (
     FlatGroupedMapping,
     ObjectInstantiationMapping,
     ResourceDefinitionMapping,
+    BaseBucketDefinition,
     BucketDefinitionMapping,
     EndpointDefinitionMapping,
     RouteTrieMapping,
@@ -495,6 +496,38 @@ class ResourceDefinitionMappingTestCase(unittest.TestCase):
         }]
         self.assertEqual(1, len(mapping['/some/path/{id}']))
         self.assertEqual(mapping['/some/path/{id}'][0].name, 'obj3')
+
+
+class BaseBucketDefinitionTestCase(unittest.TestCase):
+
+    def test_base_match(self):
+        bucket = BaseBucketDefinition([], {'accept': ['text/html']})
+        self.assertEqual(0, bucket.match({'accept': 'text/plain'}))
+        self.assertEqual(1, bucket.match({'accept': 'text/html'}))
+        self.assertEqual(1, bucket.match({
+            'accept': 'text/html',
+            'x-some-unrelated-thing': 'somevalue',
+        }))
+
+    def test_multi_match(self):
+        bucket = BaseBucketDefinition([], {
+            'accept': ['text/xml', 'application/xml'],
+            'accept-language': ['en-NZ', 'en-US'],
+        })
+        self.assertEqual(0, bucket.match({'accept': 'application/xml'}))
+        self.assertEqual(0, bucket.match({'accept-language': 'en-NZ'}))
+        self.assertEqual(1, bucket.match({
+            'accept': 'text/xml',
+            'accept-language': 'en-NZ',
+        }))
+        self.assertEqual(1, bucket.match({
+            'accept': 'application/xml',
+            'accept-language': 'en-US',
+        }))
+        self.assertEqual(0, bucket.match({
+            'accept': 'text/xml',
+            'accept-language': 'ja-JP',
+        }))
 
 
 class BucketDefinitionMappingTestCase(unittest.TestCase):

@@ -367,11 +367,27 @@ class BaseBucketDefinition(object):
             A list of roots that the content to be served from this
             bucket may be resolved from.
         environment
-            Additional mapping for this bucket
+            Additional mapping for this bucket, where the key is a
+            string and values implement __contains__
         """
 
         self.roots = roots
         self.environment = environment
+
+    def match(self, mapping):
+        """
+        Return True if the provide keyword arguments are all found
+        inside the environment mapping.
+        """
+
+        for key, value in self.environment.items():
+            if not (key in mapping and mapping[key] in value):
+                return 0
+        else:
+            # XXX should return a score between 0 and 1.
+            return 1
+            # I am not even sure how or if multidimensional matching
+            # should even be handled?!
 
 
 class BaseBucketDefinitionMapping(BasePreparedMapping):

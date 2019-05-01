@@ -73,7 +73,8 @@ class Configuration(BaseConfiguration):
         self.compiled_route_resources = CompiledRouteResourceDefinitionMapping(
             rtres)
 
-    def execution_locals_from_route_mapping(self, route, mapping):
+    def execution_locals_from_route_mapping(
+            self, route, mapping, bucket_mapping={}):
         """
         Generates an execution locals from a route and a mapping that
         may be produced externally to this class.
@@ -84,12 +85,26 @@ class Configuration(BaseConfiguration):
             the route that was picked
         mapping
             the mapping extracted from the url.
+
+        Optional Argument:
+
+        bucket_mapping
+            the mapping for the values for bucket resolution.
         """
 
-        resources = self.compiled_route_resources[route]  # raises KeyError
+        # resolve the target bucket with the bucket mapping and the
+        # bucket config mapping.
+        bucket_key, bucket = self.bucket(bucket_mapping)
+
+        # This currently raises a simple KeyError
+        resources = self.compiled_route_resources[route]
+        # Given that there could be alternative routes, it would be
+        # useful to raise more specific exception, or even make the
+        # behavior configurable.  Ideally, the downstream framework
+        # should be able to respond with HTTP 406 Not Acceptable to
+        # the user-agent, under the most pure implementation sense.
+
         # TODO figure out how to "execute" the endpoint
-        # TODO how to actually figure out which "profile" to use
-        # XXX the usage of '_' is hardcoded.
-        endpoint = self.endpoint['_'][route]
+        endpoint = self.endpoint[bucket_key][route]
         return ExecutionLocals([
             endpoint.environment, self.environment, resources, dict(mapping)])

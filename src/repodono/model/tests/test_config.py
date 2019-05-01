@@ -204,16 +204,13 @@ class ConfigIntegrationTestCase(unittest.TestCase):
         __roots__ = ["default_root", "generated_root"]
         accept = ["*/*"]
 
-        # Comment these out for now; will need to test whether or not a
-        # hard dependency for the end point on a bucket be required.
-        #
-        # [bucket.json]
-        # __roots__ = ["json_root"]
-        # accept = ["application/json", "text/json"]
-        #
-        # [bucket.xml]
-        # __roots__ = ["xml_root"]
-        # accept = ["application/xml", "text/xml"]
+        [bucket.json]
+        __roots__ = ["json_root"]
+        accept = ["application/json", "text/json"]
+
+        [bucket.xml]
+        __roots__ = ["xml_root"]
+        accept = ["application/xml", "text/xml"]
 
         [environment.paths]
         base_root = %r
@@ -240,6 +237,17 @@ class ConfigIntegrationTestCase(unittest.TestCase):
         [endpoint._."/entry/{entry_id}/details"]
         __handler__ = "blog_entry_details"
         details = true
+        format = "default"
+
+        [endpoint.json."/entry/{entry_id}/details"]
+        __handler__ = "blog_entry_details"
+        details = true
+        format = "simple"
+
+        [endpoint.xml."/entry/{entry_id}/details"]
+        __handler__ = "blog_entry_details"
+        details = true
+        format = "verbose"
         """ % (root.name,))
 
         top_locals = config.execution_locals_from_route_mapping(
@@ -265,3 +273,18 @@ class ConfigIntegrationTestCase(unittest.TestCase):
             root.name
         )
         self.assertTrue(details_locals['details'])
+        self.assertEqual(details_locals['format'], 'default')
+
+        details_locals = config.execution_locals_from_route_mapping(
+            '/entry/{entry_id}/details', {'entry_id': '123'}, {
+                'accept': 'application/json',
+            })
+        self.assertEqual(details_locals['entry_viewer'].path, '123')
+        self.assertEqual(details_locals['format'], 'simple')
+
+        details_locals = config.execution_locals_from_route_mapping(
+            '/entry/{entry_id}/details', {'entry_id': '123'}, {
+                'accept': 'application/xml',
+            })
+        self.assertEqual(details_locals['entry_viewer'].path, '123')
+        self.assertEqual(details_locals['format'], 'verbose')

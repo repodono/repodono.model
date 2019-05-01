@@ -1,6 +1,7 @@
 from inspect import signature
 from functools import partial
 from pathlib import Path
+from types import FunctionType
 from collections import (
     Sequence,
     Mapping,
@@ -102,6 +103,8 @@ class FlatGroupedMapping(BaseMapping):
 
     def __init__(self, mappings):
         # FIXME implement error checks
+        # TODO verify uniqueness??  How do we deal with the subclass of
+        # this??
         self.__mappings = mappings
         super().__init__()
 
@@ -446,6 +449,10 @@ class BucketDefinitionMapping(
     # that provides a more robust mimetype parsing/model of it will be
     # beneficial.
 
+    # TODO figure out how and where to memoize the results to speed up
+    # future lookups, as the variety of incoming mappings shouldn't vary
+    # by much (as they are typically HTTP headers).
+
     def __call__(self, mapping):
         """
         As the value assigned must result in a BucketDefinition, this
@@ -614,19 +621,63 @@ def StructuredMapping(definition, structured_mapper=structured_mapper):
     """
     A class factory for the creation of a parent class that can
     encapsulate a predefined structure for creating a flattened group
-    mapping.
+    mapping.  Depending on the number of definition entries, certain
+    attributes of the incoming class may be reflected on the class
+    produced by this factory function.
     """
 
-    class StructuredMapping(FlatGroupedMapping):
+    # Previously as implemented, the idea was to have the following:
 
-        def __init__(self, raw_mapping):
-            mappings = []
-            # assign mappings to the private attribute.
-            super().__init__(mappings=mappings)
-            structured_mapper(
-                definition, raw_mapping, _maps=mappings, vars_=self)
+    # 1) Provide a FlatGroupedMapping, with the possibility for nesting
+    #    and resolution of the value through one of the internal
+    #    mappings as per the implementation
+    # 2) Provide immutability for the initial set of keys provided by
+    #    the initial input mapping.
+    # 3) Combined together with other classes of the same type, a set of
+    #    these classes can work together to form the required mapping
+    #    from a single input mapping (i.e. uniform across all of them),
+    #    extracting just the relevant information from this while also
+    #    maintaining the mapping based API usage.
 
-    return StructuredMapping
+    # However, if the definition for a particular section is provided by
+    # a single definition, wrapping that one single thing around the
+    # StructuredMapping class removes any potential ergonomic methods
+    # that may be provided by that singular class thus removing the
+    # ability for direct usage due to this encapsulation.  Instead of a
+    # simple mapping class definition that subclass directly from
+    # FlatGroupedMapping, a more involved dynamic class construction is
+    # needed.
+
+    # Currently, the scope of this is limited to support callable
+    # mappings
+
+    __dict__ = {}
+
+    def __init__(self, raw_mapping):
+        # TODO figure out if we want to keep using the double dunder
+        # private prefix, as while on one hand we want to really keep
+        # this hidden, but on the other hand internal usage does make it
+        # more accessible if we are to make this kind of semi-public.
+        self.__mappings = []
+        # assign mappings to the private attribute for parent class.
+        super().__init__(mappings=self.__mappings)
+        structured_mapper(
+            definition, raw_mapping, _maps=self.__mappings, vars_=self)
+
+    def __call__(self, *a, **kw):
+        return self.__mappings[0](*a, **kw)
+
+    if (len(definition) == 1 and
+            isinstance(definition[0][1], type) and
+            isinstance(
+                getattr(definition[0][1], '__call__', None), FunctionType)):
+        __dict__['__call__'] = __call__
+
+    # Multiple definition case will encapsulate the entire thing as a
+    # FlatGroupedMapping.
+    __dict__['__init__'] = __init__
+    __class__ = type('StructuredMapping', (FlatGroupedMapping,), __dict__)
+    return __class__
 
 
 def create_empty_trie():

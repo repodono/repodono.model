@@ -250,7 +250,31 @@ class StructuredMapperTestCase(unittest.TestCase):
 
 class StructuredMappingTestCase(unittest.TestCase):
 
-    def test_creation_basic(self):
+    def test_creation_single(self):
+        cls = StructuredMapping((
+            ('root', BaseMapping),
+        ))
+        mapping = cls({
+            'root': {
+                'child1': 'value1',
+                'child2': 'value2',
+            },
+        })
+        self.assertEqual(2, len(mapping))
+        self.assertEqual(mapping['child1'], 'value1')
+        self.assertEqual(mapping['child2'], 'value2')
+
+        self.assertFalse(callable(mapping))
+        self.assertNotIn('child3', mapping)
+        mapping['child3'] = 'new'
+        self.assertEqual(mapping['child3'], 'new')
+        self.assertEqual(3, len(mapping))
+        with self.assertRaises(KeyError) as e:
+            mapping['child2'] = 'new'
+
+        self.assertEqual(e.exception.args[0], "'child2' is read-only")
+
+    def test_creation_nested_definition(self):
         cls = StructuredMapping((
             ('root', (
                 ('child1', BaseMapping),
@@ -269,10 +293,70 @@ class StructuredMappingTestCase(unittest.TestCase):
                 },
             },
         })
+        self.assertFalse(callable(mapping))
         self.assertEqual(3, len(mapping))
         self.assertEqual(mapping['key1'], 'child1.1')
         self.assertEqual(mapping['key2'], 'child1.2')
         self.assertEqual(mapping['key3'], 'child2.3')
+
+        self.assertNotIn('key4', mapping)
+        mapping['key4'] = 'new'
+        self.assertEqual(mapping['key4'], 'new')
+        self.assertEqual(4, len(mapping))
+        with self.assertRaises(KeyError) as e:
+            mapping['key3'] = 'new'
+
+        self.assertEqual(e.exception.args[0], "'key3' is read-only")
+
+    def test_creation_nested_structured_mapping(self):
+        cls = StructuredMapping((
+            ('root', StructuredMapping((
+                ('child1', BaseMapping),
+                ('child2', BaseMapping),
+            ),),),
+        ))
+        mapping = cls({
+            'root': {
+                'child1': {
+                    'key1': 'child1.1',
+                    'key2': 'child1.2',
+                },
+                'child2': {
+                    'key2': 'child2.2',
+                    'key3': 'child2.3',
+                },
+            },
+        })
+        self.assertFalse(callable(mapping))
+        self.assertEqual(3, len(mapping))
+        self.assertEqual(mapping['key1'], 'child1.1')
+        self.assertEqual(mapping['key2'], 'child1.2')
+        self.assertEqual(mapping['key3'], 'child2.3')
+
+        self.assertNotIn('key4', mapping)
+        mapping['key4'] = 'new'
+        self.assertEqual(mapping['key4'], 'new')
+        self.assertEqual(4, len(mapping))
+        with self.assertRaises(KeyError) as e:
+            mapping['key3'] = 'new'
+
+        self.assertEqual(e.exception.args[0], "'key3' is read-only")
+
+    def test_creation_with_callable_mapping(self):
+        called = []
+
+        class CallableMapping(BaseMapping):
+            def __call__(self):
+                called.append(True)
+
+        cls = StructuredMapping((
+            ('root', CallableMapping),
+        ))
+        mapping = cls({'root': {'key': 'value'}})
+        self.assertTrue(callable(mapping))
+        self.assertNotIn(True, called)
+        mapping()
+        self.assertIn(True, called)
 
 
 class ObjectInstantiationMappingTestCase(unittest.TestCase):

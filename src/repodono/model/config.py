@@ -6,7 +6,7 @@ import toml
 
 from repodono.model.base import (
     BaseMapping,
-    ExecutionLocals,
+    Execution,
     RouteTrieMapping,
     CompiledRouteResourceDefinitionMapping,
 )
@@ -73,10 +73,11 @@ class Configuration(BaseConfiguration):
         self.compiled_route_resources = CompiledRouteResourceDefinitionMapping(
             rtres)
 
-    def execution_locals_from_route_mapping(
-            self, route, mapping, bucket_mapping={}):
+    def request_execution(
+            self, route, mapping, bucket_mapping={},
+            execution_class=Execution):
         """
-        Generates an execution locals from a route and a mapping that
+        Generates an execution object from a route and a mapping that
         may be produced externally to this class.
 
         Arguments:
@@ -90,6 +91,8 @@ class Configuration(BaseConfiguration):
 
         bucket_mapping
             the mapping for the values for bucket resolution.
+        execution_class
+            the class that implements the execution
         """
 
         # resolve the target bucket with the bucket mapping and the
@@ -104,16 +107,15 @@ class Configuration(BaseConfiguration):
         # This currently raises a simple KeyError
         endpoint = self.route_bucket_endpoint_resolver(route, bucket_mapping)
         resources = self.compiled_route_resources[route]
-
-        # TODO figure out how to "execute" the endpoint
-        return ExecutionLocals([
-            endpoint.environment, self.environment, resources, dict(mapping)])
+        return execution_class(endpoint, self.environment, resources, mapping)
 
     def route_bucket_endpoint_resolver(self, route, bucket_mapping={}):
         """
         Resolves the bucket based on the incoming keyword arguments
         passed to this method.
         """
+
+        # TODO this may be a useful method to memoize
 
         for bucket_key, bucket in self.bucket(bucket_mapping):
             endpoint = self.endpoint[bucket_key].get(route, NotImplemented)
@@ -123,3 +125,21 @@ class Configuration(BaseConfiguration):
         else:
             raise KeyError(
                 "route '%s' cannot be resolved from endpoints" % route)
+
+    def endpoint_callable_factory(self):
+        """
+        Produce generic callables (possibly from an input function) that
+        would have a way to disambiguate the bucket to use, and then
+        select the intended handler to produce the desired output.
+
+        We would need a way to match some auxilary input mapping (i.e.
+        http headers) against the ones specified by the bucket.
+
+        Alternatively, allow hooking of middleware of the supported
+        frameworks (e.g. sanic or flask) and have it set the bucket
+        name such that the generic endpoint will do its work.
+
+        Or, the configuration specify the generic endpoint constructor
+        which will build the thing?  Wouldn't this be something that
+        should be specified at runtime?
+        """

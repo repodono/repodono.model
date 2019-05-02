@@ -220,6 +220,11 @@ class ConfigIntegrationTestCase(unittest.TestCase):
         __init__ = "repodono.model.testing:Thing"
         path = "base_root"
 
+        [[resource."/"]]
+        __name__ = "blog_entry_details"
+        __init__ = "repodono.model.testing:Thing"
+        path = "format"
+
         [[resource."/entry/{entry_id}"]]
         __name__ = "env_poker"
         __init__ = "repodono.model.testing:Thing"
@@ -250,47 +255,51 @@ class ConfigIntegrationTestCase(unittest.TestCase):
         format = "verbose"
         """ % (root.name,))
 
-        top_locals = config.execution_locals_from_route_mapping(
+        top = config.request_execution(
             '/entry/{entry_id}', {'entry_id': '123'})
-        self.assertEqual(top_locals['entry_viewer'].path, '123')
+        self.assertEqual(top.locals['entry_viewer'].path, '123')
         self.assertEqual(
             # first path reference the "thing" environment.object
             # second path reference the "base_root" in environment.paths
-            str(top_locals['env_poker'].path.path),
+            str(top.locals['env_poker'].path.path),
             # the TemporaryDirectory.name
             root.name
         )
-        self.assertFalse(top_locals['details'])
+        self.assertFalse(top.locals['details'])
 
-        details_locals = config.execution_locals_from_route_mapping(
+        details = config.request_execution(
             '/entry/{entry_id}/details', {'entry_id': '123'})
-        self.assertEqual(details_locals['entry_viewer'].path, '123')
+        self.assertEqual(details.locals['entry_viewer'].path, '123')
         self.assertEqual(
             # first path reference the "thing" environment.object
             # second path reference the "base_root" in environment.paths
-            str(details_locals['env_poker'].path.path),
+            str(details.locals['env_poker'].path.path),
             # the TemporaryDirectory.name
             root.name
         )
-        self.assertTrue(details_locals['details'])
-        self.assertEqual(details_locals['format'], 'default')
+        self.assertTrue(details.locals['details'])
+        self.assertEqual(details.locals['format'], 'default')
+        # testing the simple invocation.
+        self.assertEqual(details().path, 'default')
 
-        details_locals = config.execution_locals_from_route_mapping(
+        json_details = config.request_execution(
             '/entry/{entry_id}/details', {'entry_id': '123'}, {
                 'accept': 'application/json',
             })
-        self.assertEqual(details_locals['entry_viewer'].path, '123')
-        self.assertEqual(details_locals['format'], 'simple')
+        self.assertEqual(json_details.locals['entry_viewer'].path, '123')
+        self.assertEqual(json_details.locals['format'], 'simple')
+        self.assertEqual(json_details().path, 'simple')
 
-        details_locals = config.execution_locals_from_route_mapping(
+        xml_details = config.request_execution(
             '/entry/{entry_id}/details', {'entry_id': '123'}, {
                 'accept': 'application/xml',
             })
-        self.assertEqual(details_locals['entry_viewer'].path, '123')
-        self.assertEqual(details_locals['format'], 'verbose')
+        self.assertEqual(xml_details.locals['entry_viewer'].path, '123')
+        self.assertEqual(xml_details.locals['format'], 'verbose')
+        self.assertEqual(xml_details().path, 'verbose')
 
         with self.assertRaises(KeyError):
-            config.execution_locals_from_route_mapping(
+            config.request_execution(
                 '/entry/{entry_id}/debug', {'entry_id': '123'})
 
     def test_no_default_bucket(self):
@@ -326,22 +335,22 @@ class ConfigIntegrationTestCase(unittest.TestCase):
         debug = true
         """ % (root.name,))
 
-        details_locals = config.execution_locals_from_route_mapping(
+        details = config.request_execution(
             '/entry/{entry_id}/details', {'entry_id': '123'}, {
                 'accept': 'application/json',
             })
-        self.assertEqual(details_locals['format'], 'simple')
+        self.assertEqual(details.locals['format'], 'simple')
 
         with self.assertRaises(KeyError):
             # simple KeyError check for now, we will likely need a more
             # explicit type for this.
-            config.execution_locals_from_route_mapping(
+            config.request_execution(
                 '/entry/{entry_id}/details', {'entry_id': '123'}, {
                     'accept': 'text/plain',
                 })
 
         with self.assertRaises(KeyError):
-            config.execution_locals_from_route_mapping(
+            config.request_execution(
                 '/entry/{entry_id}/debug', {'entry_id': '123'}, {
                     'accept': 'application/json',
                 })

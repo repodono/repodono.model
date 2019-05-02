@@ -810,3 +810,43 @@ class ExecutionLocals(FlatGroupedMapping):
             return value(vars_=self)()
         else:
             return value
+
+
+class Execution(object):
+    """
+    This tentatively named object will encapsulate an invoked endpoint
+    of an application.
+    """
+
+    def __init__(self, endpoint, environment, resources, endpoint_mapping):
+        """
+        Arguments:
+
+        endpoint
+            an instance of BaseEndpointDefinition
+        environment
+            a mapping representing some base runtime environment
+        resources
+            the mapping of resources available resolved for the current
+            endpoint.
+        endpoint_mapping
+            additional mapping of values destructured from the url.
+        """
+
+        self.endpoint = endpoint
+        self.environment = environment
+        self.resources = resources
+        self.endpoint_mapping = endpoint_mapping
+        self.locals = ExecutionLocals([
+            endpoint.environment,
+            environment,
+            resources,
+            dict(endpoint_mapping),
+        ])
+
+    def __call__(self):
+        """
+        Executes the instructions encoded in the endpoint object.
+        """
+
+        return self.locals[self.endpoint.handler]

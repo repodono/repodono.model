@@ -659,11 +659,17 @@ class BucketDefinitionMappingTestCase(unittest.TestCase):
                 'accept': ['text/xml', 'application/xml'],
             },
         })
-        key, bucket = mapping({'accept': 'text/xml'})
+        key_buckets = mapping({'accept': 'text/xml'})
+        # XXX currently with how the algorithm is set up, an empty
+        # accept as defined will simply match everything, so of course
+        # there will be a fallback to the default _ bucket.
+        self.assertEqual(2, len(key_buckets))
+        key, bucket = key_buckets[0]
+        # first match should be xml
         self.assertEqual('xml', key)
         self.assertEqual(['xml_location'], bucket.roots)
 
-        key, bucket = mapping({'accept': 'text/html'})
+        key, bucket = mapping({'accept': 'text/html'})[0]
         self.assertEqual('_', key)
         self.assertEqual(['some_location'], bucket.roots)
 

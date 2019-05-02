@@ -460,11 +460,10 @@ class BucketDefinitionMapping(
         """
 
         _ = self.default_key
-        score, key_bucket = sorted(
+        key_buckets = sorted((key_bucket for score, key_bucket in (
             (bucket.match(mapping), (key, bucket))
-            for key, bucket in self.items()
-        )[-1]
-        return (_, self[_]) if score == 0 else key_bucket
+            for key, bucket in self.items()) if score), reverse=True)
+        return key_buckets if key_buckets else [(_, self[_])]
 
 
 class BaseEndpointDefinition(object):

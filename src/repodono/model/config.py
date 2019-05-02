@@ -94,17 +94,32 @@ class Configuration(BaseConfiguration):
 
         # resolve the target bucket with the bucket mapping and the
         # bucket config mapping.
-        bucket_key, bucket = self.bucket(bucket_mapping)
 
-        # This currently raises a simple KeyError
-        resources = self.compiled_route_resources[route]
         # Given that there could be alternative routes, it would be
         # useful to raise more specific exception, or even make the
         # behavior configurable.  Ideally, the downstream framework
         # should be able to respond with HTTP 406 Not Acceptable to
         # the user-agent, under the most pure implementation sense.
 
+        # This currently raises a simple KeyError
+        endpoint = self.route_bucket_endpoint_resolver(route, bucket_mapping)
+        resources = self.compiled_route_resources[route]
+
         # TODO figure out how to "execute" the endpoint
-        endpoint = self.endpoint[bucket_key][route]
         return ExecutionLocals([
             endpoint.environment, self.environment, resources, dict(mapping)])
+
+    def route_bucket_endpoint_resolver(self, route, bucket_mapping={}):
+        """
+        Resolves the bucket based on the incoming keyword arguments
+        passed to this method.
+        """
+
+        for bucket_key, bucket in self.bucket(bucket_mapping):
+            endpoint = self.endpoint[bucket_key].get(route, NotImplemented)
+            if endpoint is NotImplemented:
+                continue
+            return endpoint
+        else:
+            raise KeyError(
+                "route '%s' cannot be resolved from endpoints" % route)

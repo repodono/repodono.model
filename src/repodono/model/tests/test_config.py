@@ -288,3 +288,60 @@ class ConfigIntegrationTestCase(unittest.TestCase):
             })
         self.assertEqual(details_locals['entry_viewer'].path, '123')
         self.assertEqual(details_locals['format'], 'verbose')
+
+        with self.assertRaises(KeyError):
+            config.execution_locals_from_route_mapping(
+                '/entry/{entry_id}/debug', {'entry_id': '123'})
+
+    def test_no_default_bucket(self):
+        root = TemporaryDirectory()
+        self.addCleanup(root.cleanup)
+        config = Configuration.from_toml("""
+        [environment.variables]
+        foo = "bar"
+
+        [bucket.json]
+        __roots__ = ["json_root"]
+        accept = ["application/json", "text/json"]
+
+        [bucket.xml]
+        __roots__ = ["xml_root"]
+        accept = ["application/xml", "text/xml"]
+
+        [environment.paths]
+        base_root = %r
+
+        [endpoint.json."/entry/{entry_id}/details"]
+        __handler__ = "blog_entry_details"
+        details = true
+        format = "simple"
+
+        [endpoint.xml."/entry/{entry_id}/details"]
+        __handler__ = "blog_entry_details"
+        details = true
+        format = "verbose"
+
+        [endpoint.xml."/entry/{entry_id}/debug"]
+        __handler__ = "blog_entry_details"
+        debug = true
+        """ % (root.name,))
+
+        details_locals = config.execution_locals_from_route_mapping(
+            '/entry/{entry_id}/details', {'entry_id': '123'}, {
+                'accept': 'application/json',
+            })
+        self.assertEqual(details_locals['format'], 'simple')
+
+        with self.assertRaises(KeyError):
+            # simple KeyError check for now, we will likely need a more
+            # explicit type for this.
+            config.execution_locals_from_route_mapping(
+                '/entry/{entry_id}/details', {'entry_id': '123'}, {
+                    'accept': 'text/plain',
+                })
+
+        with self.assertRaises(KeyError):
+            config.execution_locals_from_route_mapping(
+                '/entry/{entry_id}/debug', {'entry_id': '123'}, {
+                    'accept': 'application/json',
+                })

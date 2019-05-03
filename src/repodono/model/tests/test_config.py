@@ -159,7 +159,7 @@ class ConfigResourceTestCase(unittest.TestCase):
 
 class ConfigEndpointTestCase(unittest.TestCase):
 
-    def test_basic_resource(self):
+    def test_basic_endpoint_environment(self):
         config = Configuration.from_toml("""
         [endpoint._."/entry/{entry_id}"]
         __handler__ = "blog_entry"
@@ -180,6 +180,27 @@ class ConfigEndpointTestCase(unittest.TestCase):
             "item": 2,
             "target": "json",
         }, config.endpoint['json']['/entry/{entry_id}'].environment)
+
+    def test_basic_endpoints_lists(self):
+        config = Configuration.from_toml("""
+        [endpoint._."/entry/{entry_id}"]
+        __handler__ = "blog_entry"
+        item = 2
+        target = "html"
+
+        [endpoint."json"."/entry/{entry_id}/debug"]
+        __handler__ = "blog_entry"
+        item = 2
+        target = "json"
+        """)
+        self.assertEqual([
+            '/entry/{entry_id}/debug',
+            '/entry/{entry_id}',
+        ], config.endpoint_keys)
+
+        # TODO need to test cases when more sanity checking, such as the
+        # checking of routes that cannot be resolved because it collides
+        # with a similar route (e.g. two routes with same prefix/id).
 
 
 class ConfigIntegrationTestCase(unittest.TestCase):

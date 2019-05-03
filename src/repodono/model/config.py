@@ -54,17 +54,24 @@ class Configuration(BaseConfiguration):
         self.endpoint = Endpoint(self)
         self.compile()
 
+    @property
+    def endpoint_keys(self):
+        # reverse order so that longer uritemplate strings come before
+        # the shorter ones for any pairs with identical prefix, as the
+        # longer ones are generally more specific.
+        return sorted(self._endpoint_keys, reverse=True)
+
     def compile(self):
         """
         Compile the configuration into the form that may be used.
         """
 
-        self.endpoint_keys = set()
+        self._endpoint_keys = set()
         for endpoint_definition in self.endpoint.values():
-            self.endpoint_keys.update(endpoint_definition.keys())
+            self._endpoint_keys.update(endpoint_definition.keys())
 
         rtres = RouteTrieMapping(self.resource)
-        for endpoints in self.endpoint_keys:
+        for endpoints in self._endpoint_keys:
             # using setdefault to assign an empty list for endpoints
             # that do not already have a correlated set of resources
             # defined.

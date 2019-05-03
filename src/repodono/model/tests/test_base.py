@@ -1,10 +1,14 @@
 import unittest
+from pathlib import Path
+from functools import partial
 from ast import literal_eval
 
 from repodono.model.base import (
     BaseMapping,
     BasePreparedMapping,
     BaseResourceDefinition,
+    PathMapping,
+    DeferredComputedMapping,
     PreparedMapping,
     CompiledRouteResourceDefinitionMapping,
     DeferredPreparedMapping,
@@ -76,6 +80,25 @@ class BaseMappingTestCase(unittest.TestCase):
         self.assertEqual(None, dpm['0'])
         with self.assertRaises(TypeError):
             dpm['1']
+
+    def test_path_mapping(self):
+        pm = PathMapping()
+        pm['test'] = 'test'
+        self.assertTrue(isinstance(pm['test'], Path))
+
+    def test_deferred_computed_mapping(self):
+        dcm = DeferredComputedMapping()
+        items = {1: 'value'}
+        dcm['object'] = object
+        dcm['test'] = partial(items.pop, 1)
+        # repr shouldn't execute anything
+        self.assertIn('partial', repr(dcm))
+        self.assertTrue(isinstance(dcm['object'], object))
+        self.assertEqual(dcm['test'], 'value')
+        self.assertEqual({}, items)
+
+        with self.assertRaises(TypeError):
+            dcm['object'] = object()
 
 
 class FlatGroupedMappingTestCase(unittest.TestCase):

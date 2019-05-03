@@ -205,10 +205,31 @@ class DeferredPreparedMapping(BasePreparedMapping):
 
 
 class PathMapping(PreparedMapping):
+    """
+    A mapping that cast all incoming value to a pathlib.Path.
+    """
 
     @classmethod
     def prepare_from_value(self, value):
         return Path(value)
+
+
+class DeferredComputedMapping(DeferredPreparedMapping):
+    """
+    A mapping that ensures that all assigned values are standalone
+    callable objects without any arguments.
+    """
+
+    def __setitem__(self, key, value):
+        if not callable(value):
+            # TODO check that the callable may be called without any
+            # arguments, and raise a different exception otherwise.
+            raise TypeError("%r is not callable" % value)
+        super().__setitem__(key, value)
+
+    @classmethod
+    def prepare_from_value(self, value):
+        return value()
 
 
 class SequencePreparedMapping(PreparedMapping):

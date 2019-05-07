@@ -1,4 +1,5 @@
 import unittest
+from operator import attrgetter
 from pathlib import Path
 from functools import partial
 from ast import literal_eval
@@ -462,7 +463,7 @@ class BaseResourceDefinitionTestCase(unittest.TestCase):
         self.assertEqual(inst_f.path, 'the_path')
         self.assertEqual(inst_f_reassign.path, 'hi')
 
-    def test_usage_in_mapping(self):
+    def test_cast_list_to_mapping(self):
         key1 = BaseResourceDefinition(name='key1', call=Thing, kwargs={})
         key2 = BaseResourceDefinition(name='key2', call=Thing, kwargs={})
         values = [key1, key2, ('key3', 'other')]
@@ -472,6 +473,43 @@ class BaseResourceDefinitionTestCase(unittest.TestCase):
         self.assertIs(mapping['key1'], key1)
         self.assertIs(mapping['key2'], key2)
         self.assertIs(mapping['key3'], 'other')
+
+    def test_call_with_various_keys(self):
+        key_str = BaseResourceDefinition(
+            name='key1', call='thing', kwargs={'path': 'target'})
+        key_callable = BaseResourceDefinition(
+            name='key2', call=Thing, kwargs={'path': 'target'})
+        key_attrgetter = BaseResourceDefinition(
+            name='key3', call=attrgetter('thing'), kwargs={'path': 'target'})
+        key_attrgetter_dot = BaseResourceDefinition(
+            name='key4', call=attrgetter('dot_thing.path'),
+            kwargs={'path': 'dot_target'})
+
+        raw_dict = {
+            'dot_thing': Thing(path=Thing),
+            'thing': Thing,
+            'target': 'the_value',
+            'dot_target': 'dot_value',
+        }
+        base_mapping = BaseMapping(raw_dict)
+        kwargs = {}
+
+        result = key_str(vars_=raw_dict, **kwargs)
+        self.assertTrue(callable(result))
+        self.assertEqual(result().path, 'the_value')
+
+        result = key_callable(vars_=raw_dict, **kwargs)
+        self.assertTrue(callable(result))
+        self.assertEqual(result().path, 'the_value')
+
+        # for the ones involving attrgetter, BaseMapping is required.
+        result = key_attrgetter(vars_=base_mapping, **kwargs)
+        self.assertTrue(callable(result))
+        self.assertEqual(result().path, 'the_value')
+
+        result = key_attrgetter_dot(vars_=base_mapping, **kwargs)
+        self.assertTrue(callable(result))
+        self.assertEqual(result().path, 'dot_value')
 
 
 class ResourceDefinitionMappingTestCase(unittest.TestCase):
@@ -503,10 +541,10 @@ class ResourceDefinitionMappingTestCase(unittest.TestCase):
             }
         })
         marker1 = object()
-        vars_ = {
+        vars_ = BaseMapping({
             'a_function': Thing(None),
             'reference1': marker1,
-        }
+        })
         definition = mapping['/some/path/{id}'][0]
         call = definition(vars_)
         self.assertTrue(callable(call))
@@ -547,10 +585,10 @@ class ResourceDefinitionMappingTestCase(unittest.TestCase):
             }]
         })
         marker1 = object()
-        vars_ = {
+        vars_ = BaseMapping({
             'a_function': Thing(None),
             'reference1': marker1,
-        }
+        })
         definition = mapping['/some/path/{id}'][0]
         call = definition(vars_)
         self.assertTrue(callable(call))
@@ -754,7 +792,10 @@ class EndpointDefinitionMappingTestCase(unittest.TestCase):
         })
         definition = mapping['/some/path/{id}']
         # provide access to the raw keys
-        self.assertEqual(definition.handler, 'some_handler')
+        handler = object()
+        demo = BaseMapping({'some_handler': handler})
+        # actually test the handler as an attrgetter
+        self.assertIs(definition.handler(demo), handler)
         self.assertEqual(definition.root, 'some_root')
         self.assertEqual(definition.environment, {
             'key': 'some_value',

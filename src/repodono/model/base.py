@@ -1,5 +1,6 @@
 from inspect import signature
 from functools import partial
+from operator import attrgetter
 from pathlib import Path
 from types import FunctionType
 from collections import (
@@ -288,10 +289,13 @@ class BaseResourceDefinition(object):
         with the required definitions.
         """
 
-        call = (
-            self.call if callable(self.call) else
-            map_vars_value(self.call, vars_)
-        )
+        if isinstance(self.call, attrgetter):
+            call = self.call(vars_)
+        elif callable(self.call):
+            call = self.call
+        else:
+            call = map_vars_value(self.call, vars_)
+
         kwargs.update(map_vars_value(self.kwargs, vars_))
         # XXX this does NOT actually trigger the assignment to
         # vars_[self.name], as the current definition on how the
@@ -323,7 +327,7 @@ class BaseResourceDefinitionMapping(BasePreparedMapping):
             # XXX call must be an indirect call that will load the
             # actual thing from vars then return call(**kwargs)
             # FIXME this is currently a placeholder
-            return cls(name=name, call=call, kwargs=kwargs)
+            return cls(name=name, call=attrgetter(call), kwargs=kwargs)
 
         @classmethod
         def from_entry_point(cls, name, init, kwargs):
@@ -505,8 +509,9 @@ class BaseEndpointDefinition(object):
         Arguments:
 
         handler
-            The identifier to the handler that will handle this endpoint
-            definition.
+            Specifies the handler that will handle this endpoint - the
+            handler will be constructed as an operator.attrgetter
+            instance.
         root
             The identifier to the root that the generated output
             produced by the handler may be written to.
@@ -515,7 +520,7 @@ class BaseEndpointDefinition(object):
             endpoint definition.
         """
 
-        self.handler = handler
+        self.handler = attrgetter(handler)
         self.root = root
         self.environment = environment
 
@@ -877,4 +882,4 @@ class Execution(object):
         Executes the instructions encoded in the endpoint object.
         """
 
-        return self.locals[self.endpoint.handler]
+        return self.endpoint.handler(self.locals)

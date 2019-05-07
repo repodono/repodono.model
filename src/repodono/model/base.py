@@ -91,6 +91,13 @@ class BaseMapping(MutableMapping):
     def __repr__(self):
         return repr(self.__map)
 
+    def __getattr__(self, attr):
+        try:
+            return self.__getitem__(attr)
+        except KeyError:
+            raise AttributeError("'%s' object has no attribute '%s'" % (
+                type(self).__name__, attr)) from None
+
     # TODO
     # implement from_json / from_toml class constructors?
 

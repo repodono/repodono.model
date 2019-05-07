@@ -41,6 +41,24 @@ class BaseMappingTestCase(unittest.TestCase):
         mapping = BaseMapping({'a': 1})
         self.assertEqual(mapping['a'], 1)
 
+    def test_attribute_access(self):
+        mapping = BaseMapping({'a': 1})
+        self.assertEqual(mapping.a, 1)
+
+        with self.assertRaises(AttributeError) as e:
+            mapping.b
+
+        self.assertEqual(
+            "'BaseMapping' object has no attribute 'b'",
+            e.exception.args[0])
+
+        with self.assertRaises(AttributeError) as e:
+            FlatGroupedMapping([]).b
+
+        self.assertEqual(
+            "'FlatGroupedMapping' object has no attribute 'b'",
+            e.exception.args[0])
+
     def test_prepared_mappings(self):
         pm = PreparedMapping()
         pm['1'] = 1

@@ -92,13 +92,6 @@ class BaseMapping(MutableMapping):
     def __repr__(self):
         return repr(self.__map)
 
-    def __getattr__(self, attr):
-        try:
-            return self.__getitem__(attr)
-        except KeyError:
-            raise AttributeError("'%s' object has no attribute '%s'" % (
-                type(self).__name__, attr)) from None
-
     # TODO
     # implement from_json / from_toml class constructors?
 
@@ -168,6 +161,42 @@ class FlatGroupedMapping(BaseMapping):
 
     def __repr__(self):
         return repr(self.__combined())
+
+
+class AttributeMapping(Mapping):
+    """
+    A mixin class that allow access of the keys tracked by the Mapping
+    class via attribute access.  This is to aid in usage in conjunction
+    with operator.attrgetter.
+
+    This implementation omits all attributes not prefixed with an
+    underscore (``_``).
+    """
+
+    def __setattr__(self, attr, value):
+        if not attr.startswith('_'):
+            raise TypeError("can't set attributes of '%s' objects" % (
+                type(self).__name__,)) from None
+        super().__setattr__(attr, value)
+
+    def __getattr__(self, attr):
+        """
+        This is only invoked in the case where the object doesn't
+        actually have the attribute assigned directly to the object.
+        The goal here is such that valid items returned by __getitem__
+        will still fail if the key is prefixed with an underscore.
+        """
+
+        try:
+            result = self.__getitem__(attr)
+        except KeyError:
+            pass
+        else:
+            if not attr.startswith('_'):
+                return result
+
+        raise AttributeError("'%s' object has no attribute '%s'" % (
+            type(self).__name__, attr)) from None
 
 
 class BasePreparedMapping(BaseMapping):
@@ -826,7 +855,7 @@ class CompiledRouteResourceDefinitionMapping(BaseMapping):
         super().__setitem__(*self.build_item(key, value))
 
 
-class ExecutionLocals(FlatGroupedMapping):
+class ExecutionLocals(FlatGroupedMapping, AttributeMapping):
     """
     This should be constructed from a FlatGroupedMapping that has
     grouped all the relevant resource definitions mapping defined for

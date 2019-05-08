@@ -5,6 +5,7 @@ from functools import partial
 from ast import literal_eval
 
 from repodono.model.base import (
+    AttributeMapping,
     BaseMapping,
     BasePreparedMapping,
     BaseResourceDefinition,
@@ -27,6 +28,10 @@ from repodono.model.base import (
 from repodono.model.testing import Thing
 
 
+class AttrBaseMapping(BaseMapping, AttributeMapping):
+    "Only for this local base test class."
+
+
 class BaseMappingTestCase(unittest.TestCase):
 
     def test_basic(self):
@@ -42,22 +47,49 @@ class BaseMappingTestCase(unittest.TestCase):
         mapping = BaseMapping({'a': 1})
         self.assertEqual(mapping['a'], 1)
 
-    def test_attribute_access(self):
-        mapping = BaseMapping({'a': 1})
+    def test_attr_access_checks(self):
+        # Test the one with the mixin.
+        mapping = AttrBaseMapping({'a': 1})
         self.assertEqual(mapping.a, 1)
 
         with self.assertRaises(AttributeError) as e:
             mapping.b
 
         self.assertEqual(
-            "'BaseMapping' object has no attribute 'b'",
+            "'AttrBaseMapping' object has no attribute 'b'",
             e.exception.args[0])
 
+        with self.assertRaises(TypeError) as e:
+            mapping.b = 1
+
+    def test_attr_access_private_rejected(self):
+        mapping = AttrBaseMapping({
+            '_private': 1,
+        })
+
         with self.assertRaises(AttributeError) as e:
-            FlatGroupedMapping([]).b
+            mapping._private
 
         self.assertEqual(
-            "'FlatGroupedMapping' object has no attribute 'b'",
+            "'AttrBaseMapping' object has no attribute '_private'",
+            e.exception.args[0])
+
+    def test_attr_assignment_private_accepted(self):
+        mapping = AttrBaseMapping([])
+
+        with self.assertRaises(AttributeError):
+            mapping._private
+
+        mapping._private = 1
+        self.assertEqual(mapping._private, 1)
+
+    def test_attr_assignment_public_rejected(self):
+        mapping = AttrBaseMapping([])
+        with self.assertRaises(TypeError) as e:
+            mapping.a = 1
+
+        self.assertEqual(
+            "can't set attributes of 'AttrBaseMapping' objects",
             e.exception.args[0])
 
     def test_prepared_mappings(self):
@@ -491,7 +523,7 @@ class BaseResourceDefinitionTestCase(unittest.TestCase):
             'target': 'the_value',
             'dot_target': 'dot_value',
         }
-        base_mapping = BaseMapping(raw_dict)
+        attr_mapping = AttrBaseMapping(raw_dict)
         kwargs = {}
 
         result = key_str(vars_=raw_dict, **kwargs)
@@ -503,11 +535,11 @@ class BaseResourceDefinitionTestCase(unittest.TestCase):
         self.assertEqual(result().path, 'the_value')
 
         # for the ones involving attrgetter, BaseMapping is required.
-        result = key_attrgetter(vars_=base_mapping, **kwargs)
+        result = key_attrgetter(vars_=attr_mapping, **kwargs)
         self.assertTrue(callable(result))
         self.assertEqual(result().path, 'the_value')
 
-        result = key_attrgetter_dot(vars_=base_mapping, **kwargs)
+        result = key_attrgetter_dot(vars_=attr_mapping, **kwargs)
         self.assertTrue(callable(result))
         self.assertEqual(result().path, 'dot_value')
 
@@ -541,7 +573,7 @@ class ResourceDefinitionMappingTestCase(unittest.TestCase):
             }
         })
         marker1 = object()
-        vars_ = BaseMapping({
+        vars_ = AttrBaseMapping({
             'a_function': Thing(None),
             'reference1': marker1,
         })
@@ -585,7 +617,7 @@ class ResourceDefinitionMappingTestCase(unittest.TestCase):
             }]
         })
         marker1 = object()
-        vars_ = BaseMapping({
+        vars_ = AttrBaseMapping({
             'a_function': Thing(None),
             'reference1': marker1,
         })
@@ -793,8 +825,9 @@ class EndpointDefinitionMappingTestCase(unittest.TestCase):
         definition = mapping['/some/path/{id}']
         # provide access to the raw keys
         handler = object()
-        demo = BaseMapping({'some_handler': handler})
+        demo = AttrBaseMapping({'some_handler': handler})
         # actually test the handler as an attrgetter
+        self.assertTrue(isinstance(definition.handler, attrgetter))
         self.assertIs(definition.handler(demo), handler)
         self.assertEqual(definition.root, 'some_root')
         self.assertEqual(definition.environment, {
@@ -1125,6 +1158,57 @@ class CompiledRRDTestCase(unittest.TestCase):
 
 
 class ExecutionLocalsTestCase(unittest.TestCase):
+
+    def test_access_by_attribute(self):
+        exe_locals = ExecutionLocals([
+            {
+                'key': 'some_key',
+                'method': 'a_method',
+            },
+            {
+                'another_key': 'some other value',
+                'elsewhere': None,
+            }
+        ])
+
+        self.assertEqual(exe_locals.key, 'some_key')
+
+        with self.assertRaises(AttributeError) as e:
+            exe_locals.does_not_exist
+
+        self.assertEqual(
+            "'ExecutionLocals' object has no attribute 'does_not_exist'",
+            e.exception.args[0])
+
+    def test_access_private_rejected(self):
+        exe_locals = ExecutionLocals([{
+            '_private': 1,
+        }])
+
+        with self.assertRaises(AttributeError) as e:
+            exe_locals._private
+
+        self.assertEqual(
+            "'ExecutionLocals' object has no attribute '_private'",
+            e.exception.args[0])
+
+    def test_assignment_private_accepted(self):
+        exe_locals = ExecutionLocals([])
+
+        with self.assertRaises(AttributeError):
+            exe_locals._private
+
+        exe_locals._private = 1
+        self.assertEqual(exe_locals._private, 1)
+
+    def test_assignment_public_rejected(self):
+        exe_locals = ExecutionLocals([])
+        with self.assertRaises(TypeError) as e:
+            exe_locals.a = 1
+
+        self.assertEqual(
+            "can't set attributes of 'ExecutionLocals' objects",
+            e.exception.args[0])
 
     def test_execution_environment_usage(self):
         rd_map = ResourceDefinitionMapping({

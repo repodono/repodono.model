@@ -435,6 +435,22 @@ class StructuredMappingTestCase(unittest.TestCase):
 
 class ObjectInstantiationMappingTestCase(unittest.TestCase):
 
+    def test_empty(self):
+        result = ObjectInstantiationMapping([], {})
+        self.assertEqual(0, len(result))
+
+    def test_bad_value(self):
+        with self.assertRaises(ValueError):
+            ObjectInstantiationMapping([{
+                '__name__': 'missing the rest',
+            }], {})
+
+        with self.assertRaises(ValueError):
+            ObjectInstantiationMapping([{
+                '__init__': 'repodono.model.testing:Thing',
+                'path': 'a_path',
+            }], {})
+
     def test_list_dict_name_construction(self):
         value = [{
             '__name__': 'thing',
@@ -454,6 +470,44 @@ class ObjectInstantiationMappingTestCase(unittest.TestCase):
         self.assertTrue(isinstance(result['thing'], Thing))
         self.assertEqual(result['thing'].path, marker)
 
+    def test_list_dict_name_construction_multiple(self):
+        value = [{
+            '__name__': 'thing1',
+            '__init__': 'repodono.model.testing:Thing',
+            'path': 'a_path',
+        }, {
+            '__name__': 'thing2',
+            '__init__': 'repodono.model.testing:Thing',
+            'path': 'a_path',
+        }, {
+            '__name__': 'thing3',
+            '__init__': 'repodono.model.testing:Thing',
+            'path': 'a_path',
+        }]
+        marker = object()
+        vars_ = {'a_path': marker}
+        result = ObjectInstantiationMapping(value, vars_)
+        # ensure source value is untouched
+        self.assertEqual([{
+            '__name__': 'thing1',
+            '__init__': 'repodono.model.testing:Thing',
+            'path': 'a_path',
+        }, {
+            '__name__': 'thing2',
+            '__init__': 'repodono.model.testing:Thing',
+            'path': 'a_path',
+        }, {
+            '__name__': 'thing3',
+            '__init__': 'repodono.model.testing:Thing',
+            'path': 'a_path',
+        }], value)
+        self.assertTrue(isinstance(result['thing1'], Thing))
+        self.assertEqual(result['thing1'].path, marker)
+        self.assertTrue(isinstance(result['thing2'], Thing))
+        self.assertEqual(result['thing2'].path, marker)
+        self.assertTrue(isinstance(result['thing3'], Thing))
+        self.assertEqual(result['thing3'].path, marker)
+
     def test_key_value_construction(self):
         value = {'target': {
             '__init__': 'repodono.model.testing:Thing',
@@ -470,6 +524,55 @@ class ObjectInstantiationMappingTestCase(unittest.TestCase):
         }}, value)
         self.assertTrue(isinstance(result['target'], Thing))
         self.assertEqual(result['target'].path, marker)
+
+        values = {
+            'target1': {
+                '__init__': 'repodono.model.testing:Thing',
+                'path': 'a_path',
+            },
+            'target2': {
+                '__init__': 'repodono.model.testing:Thing',
+                'path': 'a_path',
+            },
+            'target3': {
+                '__init__': 'repodono.model.testing:Thing',
+                'path': 'a_path',
+            },
+        }
+        results = ObjectInstantiationMapping(values, vars_)
+        self.assertEqual({'a_path': marker}, vars_)
+        self.assertTrue(isinstance(results['target1'], Thing))
+        self.assertEqual(results['target1'].path, marker)
+        self.assertTrue(isinstance(results['target2'], Thing))
+        self.assertEqual(results['target2'].path, marker)
+        self.assertTrue(isinstance(results['target3'], Thing))
+        self.assertEqual(results['target3'].path, marker)
+
+    def test_2tuple_construction(self):
+        value = [('target', {
+            '__init__': 'repodono.model.testing:Thing',
+            'path': 'a_path',
+        })]
+        marker = object()
+        vars_ = {'a_path': marker}
+        result = ObjectInstantiationMapping(value, vars_)
+        self.assertEqual({'a_path': marker}, vars_)
+        self.assertTrue(isinstance(result['target'], Thing))
+        self.assertEqual(result['target'].path, marker)
+
+        values = [('target1', {
+            '__init__': 'repodono.model.testing:Thing',
+            'path': 'a_path',
+        }), ('target2', {
+            '__init__': 'repodono.model.testing:Thing',
+            'path': 'a_path',
+        })]
+        results = ObjectInstantiationMapping(values, vars_)
+        self.assertEqual({'a_path': marker}, vars_)
+        self.assertTrue(isinstance(results['target1'], Thing))
+        self.assertEqual(results['target1'].path, marker)
+        self.assertTrue(isinstance(results['target2'], Thing))
+        self.assertEqual(results['target2'].path, marker)
 
 
 class BaseResourceDefinitionTestCase(unittest.TestCase):

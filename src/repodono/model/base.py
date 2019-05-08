@@ -656,6 +656,8 @@ class ObjectInstantiationMapping(PreparedMapping):
     def prepare_from_value(self, value):
         # TODO if value is of a BaseResourceDefinition...
         kwargs = dict(value)
+        if '__init__' not in kwargs:
+            raise ValueError("incoming mapping missing the '__init__' key")
         entry = EntryPoint.parse('target=' + kwargs.pop('__init__'))
         target = entry.resolve()
         kwargs = {
@@ -668,14 +670,19 @@ class ObjectInstantiationMapping(PreparedMapping):
         if len(a) != 1 or not (
                 isinstance(a[0], Sequence) and
                 a[0] and
-                len(a[0]) == 1 and
                 isinstance(a[0][0], Mapping)):
             return super().update(*a, **kw)
 
-        super().update({
-            kwargs.pop('__name__'): kwargs
-            for kwargs in (dict(item) for item in a[0])
-        })
+        try:
+            mapping = {
+                kwargs.pop('__name__'): kwargs
+                for kwargs in (dict(item) for item in a[0])
+            }
+        except KeyError:
+            raise ValueError(
+                "an incoming mapping is missing the '__name__' key") from None
+        else:
+            super().update(mapping)
 
 
 def StructuredMapping(definition, structured_mapper=structured_mapper):

@@ -241,6 +241,21 @@ class ConfigIntegrationTestCase(unittest.TestCase):
         __init__ = "repodono.model.testing:Thing"
         path = "base_root"
 
+        [[environment.objects]]
+        __name__ = "mock_object"
+        __init__ = "unittest.mock:Mock"
+
+        [endpoint._."/mock_object"]
+        __handler__ = "mock_object.some_attribute"
+
+        [[resource."/mock_resource"]]
+        __name__ = "mock_resource_attr"
+        __call__ = "mock_object.mock_resource_attr"
+        path = "id"
+
+        [endpoint._."/mock_resource/{id}"]
+        __handler__ = "mock_resource_attr"
+
         [[resource."/"]]
         __name__ = "blog_entry_details"
         __init__ = "repodono.model.testing:Thing"
@@ -322,6 +337,28 @@ class ConfigIntegrationTestCase(unittest.TestCase):
         with self.assertRaises(KeyError):
             config.request_execution(
                 '/entry/{entry_id}/debug', {'entry_id': '123'})
+
+        # get the mock object, which the relevant endpoint_handler is
+        # defined to access an attribute of this object.
+        mock = config.environment['mock_object']
+        mockobj_exe = config.request_execution('/mock_object', {})
+        some_attribute = mockobj_exe()
+        # Verify that we have the same object.
+        self.assertIs(some_attribute, mock.some_attribute)
+        # Being an object, specifying that as a handler will simply
+        # access the predefined environment object and return it
+        self.assertFalse(mock.some_attribute.called)
+
+        # For the second case, ensure
+        # defined to access an attribute of this object.
+        self.assertFalse(mock.mock_resource_attr.called)
+        mockres_exe = config.request_execution('/mock_resource/{id}', {
+            'id': '321',
+        })
+        result = mockres_exe()
+        self.assertTrue(mock.mock_resource_attr.called)
+        mock.mock_resource_attr.assert_called_with(path='321')
+        self.assertIs(result, mockres_exe.locals['mock_resource_attr'])
 
     def test_no_default_bucket(self):
         root = TemporaryDirectory()

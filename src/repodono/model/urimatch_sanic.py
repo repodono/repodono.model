@@ -13,8 +13,11 @@ from repodono.model.urimatch import (
 class SanicTemplateConverterFactory(TemplateConverterFactory):
 
     def __call__(self, template):
+        # XXX maybe override the actual method may be better?
+        # this assumes this way does not conflict with sorting?
         return ''.join(
-            fragment for type_, orig, fragment in self.iter_template(template)
+            fragment for type_, name, orig, fragment in self.iter_template(
+                template)
             # ensure that the fragment did originated from the template,
             # as the final fragment will be added by sanic router.
             if orig

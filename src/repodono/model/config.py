@@ -16,6 +16,7 @@ from repodono.model.mappings import (
     Resource,
     Endpoint,
 )
+from repodono.model.routing import URITemplateRouter
 
 
 # Perhaps this could be another class in the base module?
@@ -56,10 +57,7 @@ class Configuration(BaseConfiguration):
 
     @property
     def endpoint_keys(self):
-        # reverse order so that longer uritemplate strings come before
-        # the shorter ones for any pairs with identical prefix, as the
-        # longer ones are generally more specific.
-        return sorted(self._endpoint_keys, reverse=True)
+        return [matcher.template.uri for matcher in self.router.matchers]
 
     def compile(self):
         """
@@ -79,6 +77,8 @@ class Configuration(BaseConfiguration):
 
         self.compiled_route_resources = CompiledRouteResourceDefinitionMapping(
             rtres)
+        # just use the router to "sort" the endpoint keys for now.
+        self.router = URITemplateRouter.from_strings(self._endpoint_keys)
 
     def request_execution(
             self, route, mapping, bucket_mapping={},

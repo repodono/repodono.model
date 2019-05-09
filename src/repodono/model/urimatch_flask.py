@@ -49,7 +49,8 @@ class URITemplateRule(Rule):
         # need to populate self.arguments
         # XXX subdomain and/or host ignored
         self._trace.append((False, '|'))
-        for t, c, p in template_to_regex_patternstr.iter_template(self.rule):
+        for t, n, c, p in template_to_regex_patternstr.iter_template(
+                self.rule):
             self._trace.append((isinstance(t, URIVariable), c))
 
         self._matcher = URITemplateMatcher(self.rule)

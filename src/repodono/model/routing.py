@@ -3,7 +3,6 @@ This module provides helper functions and classes to assist in and
 demonstrates routing using URITemplates.
 """
 
-from operator import attrgetter
 from uritemplate import URITemplate
 
 from repodono.model.urimatch import URITemplateMatcher
@@ -23,8 +22,8 @@ class URITemplateRouter(object):
             A list of URITemplate objects.
         """
 
-        self.matchers = [URITemplateMatcher(template) for template in sorted(
-            uritemplates, key=attrgetter('uri'), reverse=True)]
+        self.matchers = sorted(
+            URITemplateMatcher(template) for template in uritemplates)
 
     @classmethod
     def from_strings(cls, uritemplate_strs):

@@ -140,3 +140,164 @@ class UriMatchTestCase(unittest.TestCase):
         self.assertEqual({
             'root': 'value',
         }, result)
+
+
+class URITemplateMatcherTestcase(unittest.TestCase):
+
+    def test_matcher_basics(self):
+        static = URITemplateMatcher(URITemplate('/test'))
+        self.assertEqual(static('/test'), {})
+
+    def test_matcher_invalid(self):
+        with self.assertRaises(ValueError):
+            URITemplateMatcher(URITemplate('/{value}/{value}'))
+
+    def test_matcher_equality_static(self):
+        first = URITemplateMatcher(URITemplate('/test'))
+        second = URITemplateMatcher(URITemplate('/test'))
+        self.assertEqual(first, second)
+
+    def test_matcher_equality_dynamic(self):
+        first = URITemplateMatcher(URITemplate('/test{/path*}'))
+        second = URITemplateMatcher(URITemplate('/test{/path*}'))
+        self.assertEqual(first, second)
+
+
+class URITemplateMatcherSortTestcase(unittest.TestCase):
+
+    def assertSorted(self, templates):
+        matchers = sorted(
+            URITemplateMatcher(URITemplate(t)) for t in templates)
+        self.assertEqual(templates, [
+            matcher.template.uri for matcher in matchers])
+        self.assertEqual(templates, [
+            matcher.template.uri for matcher in sorted(
+                list(reversed(matchers)))])
+
+    def test_static(self):
+        self.assertSorted([
+            '/root/first',
+            '/root/second',
+        ])
+
+    def test_static_equal(self):
+        self.assertSorted([
+            '/root/same',
+            '/root/same',
+        ])
+
+    def test_variables_static_mix(self):
+        # this should be the order
+        self.assertSorted([
+            '/root/view',
+            '/root/{view}',
+        ])
+
+    def test_variables_static_mix2(self):
+        self.assertSorted([
+            '/root/first',
+            '/root/second',
+            '/root/first/{view}',
+            '/root/second/{view}',
+        ])
+
+    def test_variable_root_variables_mix(self):
+        # this should be the order
+        self.assertSorted([
+            '/{root}/view',
+            '/{root}/{view}',
+        ])
+
+    def test_variable_root_variables_mix2(self):
+        # this should be the order
+        self.assertSorted([
+            '/{root}/first',
+            '/{root}/second',
+            '/{root}/{single}',
+            '/{root}{/path*}',
+        ])
+
+    def test_variable_root_variables_mix3(self):
+        self.assertSorted([
+            '/root/{id}/view',
+            '/root/{id}/zzz/{lang}/view"',
+            '/root/{id}/{zzz}/{lang}/view"',
+        ])
+        self.assertSorted([
+            '/root/{id}/view',
+            '/root/{id}/aaa/{lang}/view"',
+            '/root/{id}/{aaa}/{lang}/view"',
+        ])
+
+    def test_multi_single_variable_mix(self):
+        # this should be the order
+        self.assertSorted([
+            '/root/{somepath}/view',
+            '/root/{somepath}/foo/{some_id}/view',
+            '/root/{somepath}/{some_id}/foo/view',
+        ])
+
+    def test_multi_path_variable(self):
+        # this should be the order
+        self.assertSorted([
+            '/root{/somepath*}/foo/{some_id}/view',
+            '/root{/somepath*}/view',
+        ])
+
+    def test_multi_path_variable_mix(self):
+        # this should be the order
+        self.assertSorted([
+            '/root{/somepath*}/foo/{some_id}/view',
+            '/root{/somepath*}/{some_id}/foo/view',
+            '/root{/somepath*}/view',
+        ])
+
+    def test_multi_path_empty_tail_lower_priority(self):
+        self.assertSorted([
+            '/root/{target}{/path*}/index',
+            '/root/{target}{/path*}',
+        ])
+
+    def test_path_suffix_variable_priority(self):
+        self.assertSorted([
+            '/root/{id}{/path*}/aaa/{lang}/view',
+            '/root/{id}{/path*}/view',
+        ])
+        self.assertSorted([
+            '/root/{id}{/path*}/zzz/{lang}/view',
+            '/root/{id}{/path*}/view',
+        ])
+        # Note that this would be correct due to suffix
+        self.assertSorted([
+            '/root/{id}{/path*}/zzz/{lang}/view',
+            '/root/{id}{/path*}/{zzz}/{lang}/view',
+            '/root/{id}{/path*}/view',
+        ])
+
+        # Note that this is the current routing
+        # self.assertSorted([
+        #     '/root/{id}{/path*}/{zzz}',
+        #     '/root/{id}{/path*}/view',
+        # ])
+        # but perhaps this would be more useful in this case?
+        # figure out how to deal with "same level"
+        # self.assertSorted([
+        #     '/root/{id}{/path*}/{zzz}',
+        #     '/root/{id}{/path*}/view',
+        # ])
+
+    def test_multi_path_variable_with_ambiguous(self):
+        # this should be the order
+        self.assertSorted([
+            '/root{/somepath*}/foo/{some_id}/view',
+            '/root{/somepath*}/{some_id}/foo/view',
+            # this is an ambiguous route
+            '/root{/somepath*}/view{/morepathwut*}/view',
+        ])
+
+    def test_mismatch_types(self):
+        with self.assertRaises(TypeError):
+            sorted([
+                '/raw_string',
+                URITemplateMatcher(URITemplate('/template'))
+            ])

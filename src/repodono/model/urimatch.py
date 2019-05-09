@@ -1,4 +1,5 @@
 import regex
+from sys import maxsize
 from functools import partial
 from uritemplate.variable import URIVariable
 
@@ -157,25 +158,30 @@ class TemplateConverterFactory(object):
         """
         Iterate through the template
 
-        Yields a 3-tuple of type, original and regex fragment, where the
-        type is the type of original portion of the template fragment
-        that produced the regex fragment.
+        Yields a 4-tuple of type, name, original and regex fragment,
+        where the type is the type of original portion of the template
+        fragment that produced the regex fragment, name being the name
+        of the applicable variable name (None if the fragment was str),
+        original being the relevant original fragment and regex is the
+        regular expression constructed from the relevant fragment.
         """
 
         self._validate_uri(template)
         uri = template.uri
         for name, chunk, pat in self._iter_variables(template):
             head, uri = uri.split(chunk, 1)
-            yield (str, head, head)
-            yield (URIVariable, chunk, pat)
+            yield (str, None, head, head)
+            yield (URIVariable, name, chunk, pat)
 
-        yield (str, uri, uri)
+        yield (str, None, uri, uri)
         # how to better represent the end token?
-        yield (str, '', '$')
+        yield (str, None, '', '$')
+
+    def pattern_from_fragments(self, chunks):
+        return ''.join(fragment for type_, name, orig, fragment in chunks)
 
     def __call__(self, template):
-        return ''.join(
-            fragment for type_, orig, fragment in self.iter_template(template))
+        return self.pattern_from_fragments(self.iter_template(template))
 
 
 template_to_regex_patternstr = TemplateConverterFactory(
@@ -189,6 +195,49 @@ class URITemplateMatcher(object):
     The URI Template matcher.
     """
 
+    @staticmethod
+    def key(matcher):
+        """
+        Generate a comparison key for a matcher
+        """
+
+        if not isinstance(matcher, URITemplateMatcher):
+            raise TypeError("provided argument must be a URITemplateMatcher")
+
+        if not matcher.template.variables:
+            # all static routes will not have variables and thus they
+            # should be resolved first.
+            return (False, 0, matcher.template.uri)
+
+        target = [
+            idx for idx, variable in enumerate(matcher.variables)
+            if variable[1].get('explode')
+        ]
+
+        # TODO if there are more than one of the exploding things, they
+        # are simply infinite?
+        if len(target) == 0:
+            return True, len(matcher.variables), matcher.template.uri
+        elif len(target) > 1:
+            # 4th value, true for too many (so undefined and tuck it
+            # after everything
+            return True, maxsize, matcher.template.uri, True
+
+        # using maxsize as the basis for "maximum" number of items, even
+        # though the real limit is a bit lower than that.
+        after_count = len(matcher.variables) - (target[0] + 1)
+        symbol = matcher.table[matcher.variables[target[0]][0]]
+        prefix, after = matcher.template.uri.split(symbol)
+        return (
+            # first subset
+            True, maxsize, prefix + symbol,
+            # not multiple, TODO TBD whether this is sufficient.
+            False,
+            # first one essentially deprioitise static suffix to last
+            not bool(after_count), after_count,
+            not bool(after), after
+        )
+
     def __init__(self, template):
         """
         Arguments:
@@ -198,11 +247,21 @@ class URITemplateMatcher(object):
         """
 
         self.template = template
+        chunks = list(template_to_regex_patternstr.iter_template(template))
+        self.table = {
+            name: orig for type_, name, orig, fragment in chunks if name}
         self.regex_pattern = regex.compile(
-            template_to_regex_patternstr(template))
-        self.variables = {}
+            template_to_regex_patternstr.pattern_from_fragments(chunks))
+        # could use itertools.chain?
+        self.variables = []
         for variable in self.template.variables:
-            self.variables.update(variable.variables)
+            self.variables.extend(variable.variables)
+
+    def __lt__(self, other):
+        return self.key(self) < self.key(other)
+
+    def __eq__(self, other):
+        return self.template == other.template
 
     def __call__(self, uri):
         """
@@ -219,7 +278,7 @@ class URITemplateMatcher(object):
             return None
 
         results = {}
-        for variable, details in self.variables.items():
+        for variable, details in self.variables:
             try:
                 if details['explode']:
                     results[variable] = match.captures(variable)

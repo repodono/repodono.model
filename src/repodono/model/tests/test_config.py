@@ -194,8 +194,8 @@ class ConfigEndpointTestCase(unittest.TestCase):
         target = "json"
         """)
         self.assertEqual([
-            '/entry/{entry_id}/debug',
             '/entry/{entry_id}',
+            '/entry/{entry_id}/debug',
         ], config.endpoint_keys)
 
         # TODO need to test cases when more sanity checking, such as the

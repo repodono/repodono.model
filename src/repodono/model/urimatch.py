@@ -228,12 +228,16 @@ class URITemplateMatcher(object):
         after_count = len(matcher.variables) - (target[0] + 1)
         symbol = matcher.table[matcher.variables[target[0]][0]]
         prefix, after = matcher.template.uri.split(symbol)
+        last_symbol = matcher.table[matcher.variables[-1][0]]
+        _, suffix = matcher.template.uri.split(last_symbol)
+
         return (
             # first subset
             True, maxsize, prefix + symbol,
             # not multiple, TODO TBD whether this is sufficient.
             False,
             # first one essentially deprioitise static suffix to last
+            suffix in ('', '/'), suffix,
             not bool(after_count), after_count,
             not bool(after), after
         )

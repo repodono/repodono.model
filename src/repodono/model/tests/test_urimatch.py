@@ -187,7 +187,6 @@ class URITemplateMatcherSortTestcase(unittest.TestCase):
         ])
 
     def test_variables_static_mix(self):
-        # this should be the order
         self.assertSorted([
             '/root/view',
             '/root/{view}',
@@ -202,14 +201,12 @@ class URITemplateMatcherSortTestcase(unittest.TestCase):
         ])
 
     def test_variable_root_variables_mix(self):
-        # this should be the order
         self.assertSorted([
             '/{root}/view',
             '/{root}/{view}',
         ])
 
     def test_variable_root_variables_mix2(self):
-        # this should be the order
         self.assertSorted([
             '/{root}/first',
             '/{root}/second',
@@ -230,7 +227,6 @@ class URITemplateMatcherSortTestcase(unittest.TestCase):
         ])
 
     def test_multi_single_variable_mix(self):
-        # this should be the order
         self.assertSorted([
             '/root/{somepath}/view',
             '/root/{somepath}/foo/{some_id}/view',
@@ -238,17 +234,19 @@ class URITemplateMatcherSortTestcase(unittest.TestCase):
         ])
 
     def test_multi_path_variable(self):
-        # this should be the order
         self.assertSorted([
             '/root{/somepath*}/foo/{some_id}/view',
             '/root{/somepath*}/view',
         ])
 
     def test_multi_path_variable_mix(self):
-        # this should be the order
         self.assertSorted([
-            '/root{/somepath*}/foo/{some_id}/view',
+            # the following pair are ambiguous if some_id is 'foo', but
+            # otherwise ordering isn't too important.
             '/root{/somepath*}/{some_id}/foo/view',
+            '/root{/somepath*}/foo/{some_id}/view',
+            # this would get matched last as the suffix is effectively
+            # a static segment.
             '/root{/somepath*}/view',
         ])
 
@@ -274,24 +272,80 @@ class URITemplateMatcherSortTestcase(unittest.TestCase):
             '/root/{id}{/path*}/view',
         ])
 
-        # Note that this is the current routing
-        # self.assertSorted([
-        #     '/root/{id}{/path*}/{zzz}',
-        #     '/root/{id}{/path*}/view',
-        # ])
-        # but perhaps this would be more useful in this case?
-        # figure out how to deal with "same level"
-        # self.assertSorted([
-        #     '/root/{id}{/path*}/{zzz}',
-        #     '/root/{id}{/path*}/view',
-        # ])
+        # same level static only elements should be attempted before the
+        # variable version.
+        self.assertSorted([
+            '/root/{id}{/path*}/view',
+            '/root/{id}{/path*}/{zzz}',
+        ])
+
+        # Combination of assorted cases.
+        self.assertSorted([
+            '/root/{id}{/path*}/aaa/{lang}/a',
+            '/root/{id}{/path*}/aaa/{zzz}/{lang}/a',
+            '/root/{id}{/path*}/{zzz}/{lang}/a',
+            '/root/{id}{/path*}/aaa',
+            '/root/{id}{/path*}/aaa/{lang}/view',
+            '/root/{id}{/path*}/zzz/{lang}/view',
+            '/root/{id}{/path*}/{zzz}/{lang}/view',
+            '/root/{id}{/path*}/view',
+            '/root/{id}{/path*}/zzz',
+            '/root/{id}{/path*}/{zzz}',
+            '/root/{id}{/path*}/{zzz}/{lang}',
+            '/root/{id}{/path*}/{zzz}/{lang}/{a}',
+        ])
+
+        self.assertSorted([
+            '/root/{id}{/path*}/root/wat',
+            '/root/{id}{/path*}/{zzz}/wat',
+        ])
+
+        self.assertSorted([
+            '/root/{id}{/path*}/root/wat',
+            '/root/{id}{/path*}/root/{zzz}/wat',
+            '/root/{id}{/path*}/{zzz}/wat',
+        ])
+
+        self.assertSorted([
+            '/root/{id}{/path*}/root/',
+            '/root/{id}{/path*}/root/{zzz}/',
+            '/root/{id}{/path*}/{zzz}/',
+        ])
+
+        self.assertSorted([
+            '/root/{id}{/path*}/root',
+            '/root/{id}{/path*}/root/{zzz}',
+            '/root/{id}{/path*}/{zzz}',
+        ])
+
+        # Further cases.
+        self.assertSorted([
+            '/root/{id}{/path*}/root/{zzz}/suffix',
+            '/root/{id}{/path*}/{zzz}/suffix',
+            '/root/{id}{/path*}/root/{zzz}/{lang}/suffix',
+            '/root/{id}{/path*}/{zzz}/{lang}/suffix',
+            '/root/{id}{/path*}/root/{zzz}/{lang}/{a}/suffix',
+            '/root/{id}{/path*}/{zzz}/{lang}/{a}/suffix',
+            '/root/{id}{/path*}/root/{zzz}',
+            '/root/{id}{/path*}/{zzz}',
+            '/root/{id}{/path*}/root/{zzz}/{lang}',
+            '/root/{id}{/path*}/{zzz}/{lang}',
+            '/root/{id}{/path*}/root/{zzz}/{lang}/{a}',
+            '/root/{id}{/path*}/{zzz}/{lang}/{a}',
+            '/root/{id}{/path*}/root/{zzz}/',
+            '/root/{id}{/path*}/{zzz}/',
+            '/root/{id}{/path*}/root/{zzz}/{lang}/',
+            '/root/{id}{/path*}/{zzz}/{lang}/',
+            '/root/{id}{/path*}/root/{zzz}/{lang}/{a}/',
+            '/root/{id}{/path*}/{zzz}/{lang}/{a}/',
+        ])
 
     def test_multi_path_variable_with_ambiguous(self):
-        # this should be the order
         self.assertSorted([
-            '/root{/somepath*}/foo/{some_id}/view',
             '/root{/somepath*}/{some_id}/foo/view',
-            # this is an ambiguous route
+            '/root{/somepath*}/{some_id}/view',
+            '/root{/somepath*}/{some_id}/{foo}/view',
+            # multiple parts are really ambiguous
             '/root{/somepath*}/view{/morepathwut*}/view',
         ])
 

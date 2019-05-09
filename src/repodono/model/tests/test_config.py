@@ -162,12 +162,12 @@ class ConfigEndpointTestCase(unittest.TestCase):
     def test_basic_endpoint_environment(self):
         config = Configuration.from_toml("""
         [endpoint._."/entry/{entry_id}"]
-        __handler__ = "blog_entry"
+        __provider__ = "blog_entry"
         item = 2
         target = "html"
 
         [endpoint."json"."/entry/{entry_id}"]
-        __handler__ = "blog_entry"
+        __provider__ = "blog_entry"
         item = 2
         target = "json"
         """)
@@ -184,12 +184,12 @@ class ConfigEndpointTestCase(unittest.TestCase):
     def test_basic_endpoints_lists(self):
         config = Configuration.from_toml("""
         [endpoint._."/entry/{entry_id}"]
-        __handler__ = "blog_entry"
+        __provider__ = "blog_entry"
         item = 2
         target = "html"
 
         [endpoint."json"."/entry/{entry_id}/debug"]
-        __handler__ = "blog_entry"
+        __provider__ = "blog_entry"
         item = 2
         target = "json"
         """)
@@ -246,7 +246,7 @@ class ConfigIntegrationTestCase(unittest.TestCase):
         __init__ = "unittest.mock:Mock"
 
         [endpoint._."/mock_object"]
-        __handler__ = "mock_object.some_attribute"
+        __provider__ = "mock_object.some_attribute"
 
         [[resource."/mock_resource"]]
         __name__ = "mock_resource_attr"
@@ -254,7 +254,7 @@ class ConfigIntegrationTestCase(unittest.TestCase):
         path = "id"
 
         [endpoint._."/mock_resource/{id}"]
-        __handler__ = "mock_resource_attr"
+        __provider__ = "mock_resource_attr"
 
         [[resource."/"]]
         __name__ = "blog_entry_details"
@@ -272,21 +272,21 @@ class ConfigIntegrationTestCase(unittest.TestCase):
         path = "entry_id"
 
         [endpoint._."/entry/{entry_id}"]
-        __handler__ = "blog_entry"
+        __provider__ = "blog_entry"
         details = false
 
         [endpoint._."/entry/{entry_id}/details"]
-        __handler__ = "blog_entry_details"
+        __provider__ = "blog_entry_details"
         details = true
         format = "default"
 
         [endpoint.json."/entry/{entry_id}/details"]
-        __handler__ = "blog_entry_details"
+        __provider__ = "blog_entry_details"
         details = true
         format = "simple"
 
         [endpoint.xml."/entry/{entry_id}/details"]
-        __handler__ = "blog_entry_details"
+        __provider__ = "blog_entry_details"
         details = true
         format = "verbose"
         """ % (root.name,))
@@ -338,14 +338,14 @@ class ConfigIntegrationTestCase(unittest.TestCase):
             config.request_execution(
                 '/entry/{entry_id}/debug', {'entry_id': '123'})
 
-        # get the mock object, which the relevant endpoint_handler is
+        # get the mock object, which the relevant endpoint.provider is
         # defined to access an attribute of this object.
         mock = config.environment['mock_object']
         mockobj_exe = config.request_execution('/mock_object', {})
         some_attribute = mockobj_exe()
         # Verify that we have the same object.
         self.assertIs(some_attribute, mock.some_attribute)
-        # Being an object, specifying that as a handler will simply
+        # Being an object, specifying that as a provider will simply
         # access the predefined environment object and return it
         self.assertFalse(mock.some_attribute.called)
 
@@ -379,17 +379,17 @@ class ConfigIntegrationTestCase(unittest.TestCase):
         base_root = %r
 
         [endpoint.json."/entry/{entry_id}/details"]
-        __handler__ = "blog_entry_details"
+        __provider__ = "blog_entry_details"
         details = true
         format = "simple"
 
         [endpoint.xml."/entry/{entry_id}/details"]
-        __handler__ = "blog_entry_details"
+        __provider__ = "blog_entry_details"
         details = true
         format = "verbose"
 
         [endpoint.xml."/entry/{entry_id}/debug"]
-        __handler__ = "blog_entry_details"
+        __provider__ = "blog_entry_details"
         debug = true
         """ % (root.name,))
 

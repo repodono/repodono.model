@@ -830,7 +830,7 @@ class BaseBucketDefinitionTestCase(unittest.TestCase):
 
 class BucketDefinitionMappingTestCase(unittest.TestCase):
 
-    def test_missing_handler(self):
+    def test_missing_provider(self):
         # TODO validate exception message.
         with self.assertRaises(ValueError):
             BucketDefinitionMapping({
@@ -894,7 +894,7 @@ class BucketDefinitionMappingTestCase(unittest.TestCase):
 
 class EndpointDefinitionMappingTestCase(unittest.TestCase):
 
-    def test_missing_handler(self):
+    def test_missing_provider(self):
         # TODO validate exception message.
         with self.assertRaises(ValueError):
             EndpointDefinitionMapping({
@@ -907,7 +907,7 @@ class EndpointDefinitionMappingTestCase(unittest.TestCase):
     def test_missing_root(self):
         mapping = EndpointDefinitionMapping({
             '/some/path/{id}': {
-                '__handler__': 'some_handler',
+                '__provider__': 'some_provider',
                 'key': 'some_value',
                 'target': 'some_other_value',
             }
@@ -919,7 +919,7 @@ class EndpointDefinitionMappingTestCase(unittest.TestCase):
     def test_basic_creation(self):
         mapping = EndpointDefinitionMapping({
             '/some/path/{id}': {
-                '__handler__': 'some_handler',
+                '__provider__': 'some_provider',
                 '__root__': 'some_root',
                 'key': 'some_value',
                 'target': 'some_other_value',
@@ -927,11 +927,11 @@ class EndpointDefinitionMappingTestCase(unittest.TestCase):
         })
         definition = mapping['/some/path/{id}']
         # provide access to the raw keys
-        handler = object()
-        demo = AttrBaseMapping({'some_handler': handler})
-        # actually test the handler as an attrgetter
-        self.assertTrue(isinstance(definition.handler, attrgetter))
-        self.assertIs(definition.handler(demo), handler)
+        provider = object()
+        demo = AttrBaseMapping({'some_provider': provider})
+        # actually test the provider as an attrgetter
+        self.assertTrue(isinstance(definition.provider, attrgetter))
+        self.assertIs(definition.provider(demo), provider)
         self.assertEqual(definition.root, 'some_root')
         self.assertEqual(definition.environment, {
             'key': 'some_value',

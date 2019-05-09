@@ -533,23 +533,25 @@ class BaseEndpointDefinition(object):
     for all EndpointDefinition types.
     """
 
-    def __init__(self, handler, root, environment):
+    def __init__(self, provider, root, environment):
         """
         Arguments:
 
-        handler
-            Specifies the handler that will handle this endpoint - the
-            handler will be constructed as an operator.attrgetter
-            instance.
+        provider
+            Specifies the name that will be retrieved from the execution
+            locals to provide the data to be served from this end point.
+            This will be constructed as an operator.attrgetter instance.
         root
-            The identifier to the root that the generated output
-            produced by the handler may be written to.
+            This should reference a name that was defined by as a path
+            in the environment, so that it may be joined together with
+            the path defined for this endpoint for the full path where
+            the data produced by the provider may be written to.
         environment
             The mapping of an environment variables specific to this
             endpoint definition.
         """
 
-        self.handler = attrgetter(handler)
+        self.provider = attrgetter(provider)
         self.root = root
         self.environment = environment
 
@@ -557,19 +559,30 @@ class BaseEndpointDefinition(object):
 class BaseEndpointDefinitionMapping(BasePreparedMapping):
     """
     This defines the base endpoint definition mapping, where the value
-    assigned should be a dict, or a a mapping of arguments to the
+    assigned should be a dict, or as a mapping of arguments to the
     function being called.
 
-    At the very minimum, the __handler__ key must be specified, which
-    must point to a valid reference to some callable that can be
-    resolved.
+    At the very minimum, the __provider__ key must be specified, which
+    must point to a name available within the execution locals such that
+    it may be retrieved to provide the data.  This may be a static value
+    provided by the base environment, or dynamically computed as one of
+    the resources available for this endpoint.
 
-    The __root__ key may be specified such that the generated data may
-    be persisted onto the filesystem.  This is independent of any of
-    the references defined inside the __roots__ key for the bucket which
-    this may represent, although typical use case will be defined to be
-    in one of them (i.e. resolving from cache such that the handler do
-    not have to be called again).
+    The __root__ key may be specified such that the provided data may
+    be persisted onto the filesystem.  This is independent of any key
+    value pairs defined inside the __roots__ key for the bucket which
+    this definition is part of.  However, typical use case will define
+    this value to be one of them, but there is no restriction as to what
+    or where this may be as the value merely reference something that
+    must be available in execution locals.  Ultimately, the runner that
+    make use of this configuration file will either accept or reject
+    the specified value.
+
+    Typically, the __root__ for this endpoint should be one of the
+    values defined for the __roots__ defined for the endpoint set that
+    this endpoint is a member of for standard usage (e.g. such that the
+    stored data produced by the provider may be resolved at the level
+    of the endpoint set).
 
     This base class makes no assumption as to how the assignment and/or
     retrieval should proceed.
@@ -582,32 +595,32 @@ class BaseEndpointDefinitionMapping(BasePreparedMapping):
         pass
 
     @classmethod
-    def create_endpoint_definition(cls, handler, root, environment):
-        return cls.EndpointDefinition(handler, root, environment)
+    def create_endpoint_definition(cls, provider, root, environment):
+        return cls.EndpointDefinition(provider, root, environment)
 
     @classmethod
     def prepare_from_value(cls, value):
         environment = dict(value)
-        handler = environment.pop('__handler__', None)
-        # TODO need to verify if having the root dir omitted is to be
-        # supported.  Currently, it may mean that the generated data may
-        # never be written?
+        provider = environment.pop('__provider__', None)
+        # The __root__ key is not enforced by default; this is up to the
+        # actual application runner to deal with and/or make use of.
         root = environment.pop('__root__', None)
 
-        if not handler:
-            raise ValueError('__handler__ must be defined')
+        if not provider:
+            raise ValueError('__provider__ must be defined')
 
-        return cls.create_endpoint_definition(handler, root, environment)
+        return cls.create_endpoint_definition(provider, root, environment)
 
 
 class EndpointDefinitionMapping(
         BaseEndpointDefinitionMapping, PreparedMapping):
     """
     The endpoint mapping defines all available endpoints for a given
-    application instance.  It would reference a handler plus a root,
-    the handler being a reference to one of the items defined via the
+    application instance.  It would reference a provider plus a root,
+    the provider being a reference to one of the items defined via the
     environment or an available resource at that endpoint.  The root
-    would be the key to the root on the filesystem.
+    would be the name available inside execution locals that reference a
+    path the filesystem that serves as the root for this endpoint.
 
     Any remaining keys will be additional environment values available
     in the context of that endpoint.
@@ -918,4 +931,4 @@ class Execution(object):
         Executes the instructions encoded in the endpoint object.
         """
 
-        return self.endpoint.handler(self.locals)
+        return self.endpoint.provider(self.locals)

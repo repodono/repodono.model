@@ -63,7 +63,7 @@ class MappingsTestCase(unittest.TestCase):
             'endpoint': {
                 '_': {
                     "/entry/{entry_id}": {
-                        '__handler__': 'thing1',
+                        '__provider__': 'thing1',
                         'path': 'some_other_value',
                     },
                 },

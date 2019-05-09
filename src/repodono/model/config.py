@@ -137,7 +137,7 @@ class Configuration(BaseConfiguration):
         """
         Produce generic callables (possibly from an input function) that
         would have a way to disambiguate the bucket to use, and then
-        select the intended handler to produce the desired output.
+        select the intended provider to produce the desired output.
 
         We would need a way to match some auxilary input mapping (i.e.
         http headers) against the ones specified by the bucket.

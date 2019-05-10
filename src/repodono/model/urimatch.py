@@ -196,7 +196,7 @@ class URITemplateMatcher(object):
     """
 
     @staticmethod
-    def key(matcher):
+    def compute_sort_key(matcher):
         """
         Generate a comparison key for a matcher
         """
@@ -242,6 +242,13 @@ class URITemplateMatcher(object):
             not bool(after), after
         )
 
+    @property
+    def sort_key(self):
+        return self._sort_key
+
+    def build_sort_key(self):
+        self._sort_key = self.compute_sort_key(self)
+
     def __init__(self, template):
         """
         Arguments:
@@ -260,12 +267,16 @@ class URITemplateMatcher(object):
         self.variables = []
         for variable in self.template.variables:
             self.variables.extend(variable.variables)
+        self.build_sort_key()
 
     def __lt__(self, other):
-        return self.key(self) < self.key(other)
+        if type(self) is type(other):
+            return self.sort_key < other.sort_key
+        # always compute the key for the other guy if type mismatch
+        return self.sort_key < self.compute_sort_key(other)
 
     def __eq__(self, other):
-        return self.template == other.template
+        return type(self) is type(other) and self.template == other.template
 
     def __call__(self, uri):
         """

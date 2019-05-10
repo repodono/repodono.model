@@ -91,3 +91,11 @@ class WerkzeugRoutingTestCase(unittest.TestCase):
             'id': '1',
             'path': ['some', 'nested', 'path'],
         }), m.match('/browse/1/some/nested/path/'))
+
+    def test_precedence(self):
+        m = Map([
+            URITemplateRule('/entry/{id}', endpoint='entry'),
+            URITemplateRule('/entry/index', endpoint='entry_index'),
+        ]).bind('example.com')
+        self.assertEqual(('entry', {'id': '1'}), m.match('/entry/1'))
+        self.assertEqual(('entry_index', {}), m.match('/entry/index'))

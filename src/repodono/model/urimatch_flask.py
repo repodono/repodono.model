@@ -69,5 +69,8 @@ class URITemplateRule(Rule):
 
         return '', self.rule.expand(**dict(values))
 
+    def match_compare_key(self):
+        return self._matcher.sort_key
+
     def __str__(self):
         return self.rule.uri

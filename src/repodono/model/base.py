@@ -3,6 +3,7 @@ from functools import partial
 from operator import attrgetter
 from pathlib import Path
 from types import FunctionType
+from types import MappingProxyType
 from collections import (
     Sequence,
     Mapping,
@@ -295,6 +296,28 @@ class SequencePreparedMapping(PreparedMapping):
                 result.append(self.prepare_from_value(item))
         else:
             result.append(self.prepare_from_value(value))
+
+
+class ReMappingProxy(Mapping):
+    """
+    A read-only mapping proxy to some real mapping.
+    """
+
+    def __init__(self, remap, mapping):
+        self.__map = MappingProxyType(mapping)
+        self.__remap = MappingProxyType(dict(remap))
+
+    def __getitem__(self, key):
+        return self.__map[self.__remap[key]]
+
+    def __iter__(self):
+        return iter(k for k, v in self.__remap.items() if v in self.__map)
+
+    def __len__(self):
+        return len(list(iter(self)))
+
+    def __contains__(self, key):
+        return key in self.__remap and self.__remap[key] in self.__map
 
 
 class BaseResourceDefinition(object):

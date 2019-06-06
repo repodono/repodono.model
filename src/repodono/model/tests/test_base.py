@@ -17,6 +17,7 @@ from repodono.model.base import (
     ExecutionLocals,
     FlatGroupedMapping,
     ObjectInstantiationMapping,
+    ReMappingProxy,
     ResourceDefinitionMapping,
     BaseBucketDefinition,
     BucketDefinitionMapping,
@@ -573,6 +574,91 @@ class ObjectInstantiationMappingTestCase(unittest.TestCase):
         self.assertEqual(results['target1'].path, marker)
         self.assertTrue(isinstance(results['target2'], Thing))
         self.assertEqual(results['target2'].path, marker)
+
+
+class ReMappingProxyTestCase(unittest.TestCase):
+
+    def test_empty(self):
+        mapping = ReMappingProxy({}, {})
+        self.assertEqual(len(mapping), 0)
+
+    def test_empty_remap(self):
+        mapping = ReMappingProxy({}, {'thing': 'other'})
+        self.assertEqual(len(mapping), 0)
+        self.assertNotIn('thing', mapping)
+
+    def test_empty_mapping(self):
+        mapping = ReMappingProxy({'local': 'external'}, {})
+        self.assertEqual(len(mapping), 0)
+        self.assertNotIn('local', mapping)
+        self.assertNotIn('external', mapping)
+
+    def test_proxying_one_to_one(self):
+        base = {
+            'external1': 'value1',
+            'external2': 'value2',
+        }
+        mapping = ReMappingProxy({
+            'internal1': 'external1',
+            'internal2': 'external2',
+            'internal3': 'external3',
+        }, base)
+        self.assertIn('internal1', mapping)
+        self.assertIn('internal2', mapping)
+        self.assertEqual(list(mapping), ['internal1', 'internal2'])
+        self.assertEqual(mapping['internal1'], 'value1')
+        self.assertEqual(mapping['internal2'], 'value2')
+        self.assertNotIn('internal3', mapping)
+        self.assertEqual(len(mapping), 2)
+        base.update({
+            'external3': 'value3',
+            'external4': 'value4',
+        })
+        self.assertEqual(len(mapping), 3)
+        self.assertIn('internal3', mapping)
+        self.assertEqual(list(mapping), [
+            'internal1', 'internal2', 'internal3'])
+
+    def test_proxying_many_to_one(self):
+        value1 = object()
+        value2 = object()
+        base = {
+            'external1': value1,
+        }
+        mapping = ReMappingProxy({
+            'internal1': 'external1',
+            'internal2': 'external1',
+            'internal3': 'external1',
+            'internal4': 'external2',
+            'internal5': 'external2',
+            'internal6': 'external2',
+        }, base)
+        self.assertIn('internal1', mapping)
+        self.assertIn('internal2', mapping)
+        self.assertIn('internal3', mapping)
+        self.assertEqual(list(mapping), [
+            'internal1', 'internal2', 'internal3'])
+        self.assertIs(mapping['internal1'], value1)
+        self.assertIs(mapping['internal2'], value1)
+        self.assertIs(mapping['internal3'], value1)
+        # length is actually three, even though original mapping as one.
+        # element.
+        self.assertEqual(len(mapping), 3)
+        base['external2'] = value2
+        # likewise here.
+        self.assertEqual(len(mapping), 6)
+        self.assertEqual(list(mapping), [
+            'internal1', 'internal2', 'internal3',
+            'internal4', 'internal5', 'internal6',
+        ])
+        self.assertEqual(dict(mapping), {
+            'internal1': value1,
+            'internal2': value1,
+            'internal3': value1,
+            'internal4': value2,
+            'internal5': value2,
+            'internal6': value2,
+        })
 
 
 class BaseResourceDefinitionTestCase(unittest.TestCase):

@@ -117,7 +117,12 @@ class FlatGroupedMapping(BaseMapping):
 
         for mapping in self.__mappings:
             if key in mapping:
-                return mapping[key]
+                try:
+                    return mapping[key]
+                except KeyError:
+                    # the mapping may have lied about having the key, or
+                    # it cannot fulfill the request.
+                    continue
         else:
             raise KeyError(key)
 
@@ -144,11 +149,11 @@ class FlatGroupedMapping(BaseMapping):
             raise KeyError("%r is read-only" % key)
 
     def __combined(self):
-        results = {}
+        results = set()
         for mapping in reversed(self.__mappings):
-            results.update(mapping)
+            results.update(mapping.keys())
         # cheat access to parent _map.
-        results.update(self._BaseMapping__map)
+        results.update(self._BaseMapping__map.keys())
         return results
 
     def __iter__(self):
@@ -161,7 +166,7 @@ class FlatGroupedMapping(BaseMapping):
         return key in self.__combined()
 
     def __repr__(self):
-        return repr(self.__combined())
+        return repr({k: self[k] for k in self.__combined()})
 
 
 class AttributeMapping(Mapping):
@@ -556,7 +561,7 @@ class BaseEndpointDefinition(object):
     for all EndpointDefinition types.
     """
 
-    def __init__(self, provider, root, environment):
+    def __init__(self, provider, root, locals_bindings, environment):
         """
         Arguments:
 
@@ -569,6 +574,11 @@ class BaseEndpointDefinition(object):
             in the environment, so that it may be joined together with
             the path defined for this endpoint for the full path where
             the data produced by the provider may be written to.
+        locals_bindings
+            This defines a mapping of endpoint local keys to execution
+            locals keys, such that a local mapping will be able to
+            capture all the required key-value definitions that may be
+            passed to the the provider callable via a singular mapping.
         environment
             The mapping of an environment variables specific to this
             endpoint definition.
@@ -576,6 +586,7 @@ class BaseEndpointDefinition(object):
 
         self.provider = attrgetter(provider)
         self.root = root
+        self.locals_bindings = locals_bindings
         self.environment = environment
 
 
@@ -607,8 +618,18 @@ class BaseEndpointDefinitionMapping(BasePreparedMapping):
     stored data produced by the provider may be resolved at the level
     of the endpoint set).
 
+    Additionally, __dict__ may be used to specify a set of key-value
+    pairs, where the key will be the name of the new binding, and value
+    being the key that may be found in the execution locals.  The intent
+    of this mapping is to provide a way to construct a limited view to
+    the execution locals that will then be passed to the provider, with
+    the required keys needed by that handler refernceing the actual
+    value which may be assigned to a different key inside the execution
+    locals.
+
     This base class makes no assumption as to how the assignment and/or
-    retrieval should proceed.
+    retrieval should proceed, i.e. whether the assignments are fully
+    prepared or deferred.
     """
 
     # internal class structure similar to the resource definition
@@ -618,13 +639,16 @@ class BaseEndpointDefinitionMapping(BasePreparedMapping):
         pass
 
     @classmethod
-    def create_endpoint_definition(cls, provider, root, environment):
-        return cls.EndpointDefinition(provider, root, environment)
+    def create_endpoint_definition(
+            cls, provider, root, locals_bindings, environment):
+        return cls.EndpointDefinition(
+            provider, root, locals_bindings, environment)
 
     @classmethod
     def prepare_from_value(cls, value):
         environment = dict(value)
         provider = environment.pop('__provider__', None)
+        locals_bindings = environment.pop('__dict__', {})
         # The __root__ key is not enforced by default; this is up to the
         # actual application runner to deal with and/or make use of.
         root = environment.pop('__root__', None)
@@ -632,7 +656,8 @@ class BaseEndpointDefinitionMapping(BasePreparedMapping):
         if not provider:
             raise ValueError('__provider__ must be defined')
 
-        return cls.create_endpoint_definition(provider, root, environment)
+        return cls.create_endpoint_definition(
+            provider, root, locals_bindings, environment)
 
 
 class EndpointDefinitionMapping(
@@ -938,11 +963,17 @@ class Execution(object):
             additional mapping of values destructured from the url.
         """
 
+        def re_mapping_proxy():
+            if endpoint.locals_bindings:
+                return ReMappingProxy(endpoint.locals_bindings, self.locals)
+            raise KeyError('no __dict__')
+
         self.endpoint = endpoint
         self.environment = environment
         self.resources = resources
         self.endpoint_mapping = endpoint_mapping
         self.locals = ExecutionLocals([
+            DeferredComputedMapping(__dict__=re_mapping_proxy),
             endpoint.environment,
             environment,
             resources,

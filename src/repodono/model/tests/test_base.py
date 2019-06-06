@@ -255,6 +255,33 @@ class FlatGroupedMappingTestCase(unittest.TestCase):
         self.assertNotIn('custom', mapping)
         self.assertEqual(3, len(mapping))
 
+    def test_mapping_deferred_keyerror(self):
+        def key_error():
+            raise KeyError()
+
+        def value_error():
+            raise ValueError()
+
+        mapping = FlatGroupedMapping([
+            DeferredComputedMapping({
+                'error': key_error,
+                'foo': key_error,
+                'bar': value_error,
+            }), {
+                'foo': '1',
+                'bar': '2',
+            },
+        ])
+
+        self.assertIn('error', mapping)
+        with self.assertRaises(KeyError):
+            mapping['error']
+
+        self.assertEqual(mapping['foo'], '1')
+
+        with self.assertRaises(ValueError):
+            mapping['bar']
+
 
 class StructuredMapperTestCase(unittest.TestCase):
 
@@ -990,7 +1017,7 @@ class EndpointDefinitionMappingTestCase(unittest.TestCase):
                 }
             })
 
-    def test_missing_root(self):
+    def test_missing_optional(self):
         mapping = EndpointDefinitionMapping({
             '/some/path/{id}': {
                 '__provider__': 'some_provider',
@@ -1001,12 +1028,16 @@ class EndpointDefinitionMappingTestCase(unittest.TestCase):
         definition = mapping['/some/path/{id}']
         # for the mean time, this would be unspecified.
         self.assertIsNone(definition.root)
+        self.assertEqual(definition.locals_bindings, {})
 
     def test_basic_creation(self):
         mapping = EndpointDefinitionMapping({
             '/some/path/{id}': {
                 '__provider__': 'some_provider',
                 '__root__': 'some_root',
+                '__dict__': {
+                    'local_key', 'execution_key',
+                },
                 'key': 'some_value',
                 'target': 'some_other_value',
             }
@@ -1019,6 +1050,9 @@ class EndpointDefinitionMappingTestCase(unittest.TestCase):
         self.assertTrue(isinstance(definition.provider, attrgetter))
         self.assertIs(definition.provider(demo), provider)
         self.assertEqual(definition.root, 'some_root')
+        self.assertEqual(definition.locals_bindings, {
+            'local_key', 'execution_key',
+        })
         self.assertEqual(definition.environment, {
             'key': 'some_value',
             'target': 'some_other_value',
@@ -1436,3 +1470,6 @@ class ExecutionLocalsTestCase(unittest.TestCase):
             },
         ])
         self.assertEqual(exec_locals['use_mode'].path, 'the_mode')
+
+
+# Test cases for the Execution class is found in test_config

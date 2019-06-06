@@ -412,3 +412,97 @@ class ConfigIntegrationTestCase(unittest.TestCase):
                 '/entry/{entry_id}/debug', {'entry_id': '123'}, {
                     'accept': 'application/json',
                 })
+
+    def test_endpoint_dict_indirection(self):
+        config = Configuration.from_toml("""
+        [bucket._]
+        __roots__ = ['somewhere']
+        accept = ["*/*"]
+
+        [[resource."/entry/{entry_id}"]]
+        __name__ = "blog_entry"
+        __init__ = "repodono.model.testing:Thing"
+        path = "__dict__"
+
+        [endpoint._."/entry/{entry_id}/{action}"]
+        __provider__ = "blog_entry"
+        __dict__.id = "entry_id"
+        __dict__.method = "action"
+        """)
+
+        top = config.request_execution('/entry/{entry_id}/{action}', {
+            'entry_id': '123',
+            'action': 'blah',
+        })
+        self.assertEqual(top.locals['blog_entry'].path, {
+            'id': '123',
+            'method': 'blah',
+        })
+
+    def test_endpoint_dict_shadowing(self):
+        config = Configuration.from_toml("""
+        [environment.variables]
+        thing = "thing"
+
+        [bucket._]
+        __roots__ = ['somewhere']
+        accept = ["*/*"]
+
+        [[resource."/entry/{entry_id}"]]
+        __name__ = "__dict__"
+        __init__ = "repodono.model.testing:Thing"
+        path = "thing"
+
+        [[resource."/entry/{entry_id}"]]
+        __name__ = "blog_entry"
+        __init__ = "repodono.model.testing:Thing"
+        path = "__dict__"
+
+        [endpoint._."/entry/{entry_id}/{action}"]
+        __provider__ = "blog_entry"
+        __dict__.id = "entry_id"
+        __dict__.method = "action"
+        """)
+
+        top = config.request_execution('/entry/{entry_id}/{action}', {
+            'entry_id': '123',
+            'action': 'blah',
+        })
+        self.assertEqual(top.locals['blog_entry'].path, {
+            'id': '123',
+            'method': 'blah',
+        })
+
+        # for comparison
+        config = Configuration.from_toml("""
+        [environment.variables]
+        thing = "some big thinger"
+
+        [bucket._]
+        __roots__ = ['somewhere']
+        accept = ["*/*"]
+
+        # alternatively, define a __dict__ alone on the level such that
+        # alternative buckets/subpaths can share it.
+        [[resource."/entry/{entry_id}"]]
+        __name__ = "__dict__"
+        __init__ = "repodono.model.base:BaseMapping"
+        thinger = "thing"
+
+        [[resource."/entry/{entry_id}"]]
+        __name__ = "blog_entry"
+        __init__ = "repodono.model.testing:Thing"
+        path = "__dict__"
+
+        [endpoint._."/entry/{entry_id}/{action}"]
+        __provider__ = "blog_entry"
+        """)
+
+        top = config.request_execution('/entry/{entry_id}/{action}', {
+            'entry_id': '123',
+            'action': 'blah',
+        })
+        # simply the thing
+        self.assertEqual(top.locals['blog_entry'].path, {
+            'thinger': "some big thinger"
+        })

@@ -413,33 +413,38 @@ class ConfigIntegrationTestCase(unittest.TestCase):
                     'accept': 'application/json',
                 })
 
-    def test_endpoint_dict_indirection(self):
+    def test_endpoint_kwargs_indirection(self):
         config = Configuration.from_toml("""
+        [environment.variables]
+        thing = "env"
+
         [bucket._]
         __roots__ = ['somewhere']
         accept = ["*/*"]
 
-        [[resource."/entry/{entry_id}"]]
-        __name__ = "blog_entry"
-        __init__ = "repodono.model.testing:Thing"
-        path = "__dict__"
+        # A common shared mock object
+        [[resource."/"]]
+        __name__ = "a_mock"
+        __init__ = "unittest.mock:Mock"
 
         [endpoint._."/entry/{entry_id}/{action}"]
-        __provider__ = "blog_entry"
-        __dict__.id = "entry_id"
-        __dict__.method = "action"
+        # the template is fixed, but to test this thing out the kwargs
+        # can be remapped using the __kwargs__ key
+        __provider__ = "a_mock"
+        __kwargs__.mock_id = "entry_id"
+        __kwargs__.mock_method = "action"
+        __kwargs__.mock_thing = "thing"
         """)
 
-        top = config.request_execution('/entry/{entry_id}/{action}', {
+        exe = config.request_execution('/entry/{entry_id}/{action}', {
             'entry_id': '123',
             'action': 'blah',
         })
-        self.assertEqual(top.locals['blog_entry'].path, {
-            'id': '123',
-            'method': 'blah',
-        })
+        self.assertEqual(exe.locals['a_mock'].mock_id, '123')
+        self.assertEqual(exe.locals['a_mock'].mock_method, 'blah')
+        self.assertEqual(exe.locals['a_mock'].mock_thing, 'env')
 
-    def test_endpoint_dict_shadowing(self):
+    def test_endpoint_kwargs_shadowing(self):
         config = Configuration.from_toml("""
         [environment.variables]
         thing = "thing"
@@ -448,61 +453,44 @@ class ConfigIntegrationTestCase(unittest.TestCase):
         __roots__ = ['somewhere']
         accept = ["*/*"]
 
-        [[resource."/entry/{entry_id}"]]
-        __name__ = "__dict__"
-        __init__ = "repodono.model.testing:Thing"
-        path = "thing"
-
-        [[resource."/entry/{entry_id}"]]
-        __name__ = "blog_entry"
-        __init__ = "repodono.model.testing:Thing"
-        path = "__dict__"
+        # A common shared mock object
+        [[resource."/"]]
+        __name__ = "a_mock"
+        __init__ = "unittest.mock:Mock"
+        mock_id = "thing"
+        mock_method = "thing"
 
         [endpoint._."/entry/{entry_id}/{action}"]
-        __provider__ = "blog_entry"
-        __dict__.id = "entry_id"
-        __dict__.method = "action"
+        __provider__ = "a_mock"
+        __kwargs__.mock_id = "entry_id"
         """)
 
-        top = config.request_execution('/entry/{entry_id}/{action}', {
+        exe = config.request_execution('/entry/{entry_id}/{action}', {
             'entry_id': '123',
             'action': 'blah',
         })
-        self.assertEqual(top.locals['blog_entry'].path, {
-            'id': '123',
-            'method': 'blah',
-        })
+        self.assertEqual(exe.locals['a_mock'].mock_id, '123')
+        self.assertEqual(exe.locals['a_mock'].mock_method, 'thing')
 
-        # for comparison
+    def test_endpoint_kwargs_missing(self):
         config = Configuration.from_toml("""
-        [environment.variables]
-        thing = "some big thinger"
-
         [bucket._]
         __roots__ = ['somewhere']
         accept = ["*/*"]
 
-        # alternatively, define a __dict__ alone on the level such that
-        # alternative buckets/subpaths can share it.
-        [[resource."/entry/{entry_id}"]]
-        __name__ = "__dict__"
-        __init__ = "repodono.model.base:BaseMapping"
-        thinger = "thing"
+        # A common shared mock object
+        [[resource."/"]]
+        __name__ = "a_mock"
+        __init__ = "unittest.mock:Mock"
 
-        [[resource."/entry/{entry_id}"]]
-        __name__ = "blog_entry"
-        __init__ = "repodono.model.testing:Thing"
-        path = "__dict__"
-
-        [endpoint._."/entry/{entry_id}/{action}"]
-        __provider__ = "blog_entry"
+        [endpoint._."/entry/"]
+        # the template is fixed, but to test this thing out the kwargs
+        # can be remapped using the __kwargs__ key
+        __provider__ = "a_mock"
+        __kwargs__.mock_id = "no_such_thing"
         """)
 
-        top = config.request_execution('/entry/{entry_id}/{action}', {
-            'entry_id': '123',
-            'action': 'blah',
-        })
-        # simply the thing
-        self.assertEqual(top.locals['blog_entry'].path, {
-            'thinger': "some big thinger"
-        })
+        exe = config.request_execution('/entry/', {})
+        with self.assertRaises(KeyError) as e:
+            exe.locals['a_mock']
+        self.assertEqual(e.exception.args[0], 'no_such_thing')

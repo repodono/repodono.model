@@ -305,24 +305,46 @@ class SequencePreparedMapping(PreparedMapping):
 
 class ReMappingProxy(Mapping):
     """
-    A read-only mapping proxy to some real mapping.
+    A read-only mapping proxy to some real mapping.  Note that this is
+    a complete version such that any remap keys whoes value references
+    a key that is absent in the provided mapping will likely result in
+    some KeyError being raised.
     """
 
     def __init__(self, remap, mapping):
         self.__map = MappingProxyType(mapping)
         self.__remap = MappingProxyType(dict(remap))
 
+    @property
+    def _map(self):
+        return self.__map
+
+    @property
+    def _remap(self):
+        return self.__remap
+
     def __getitem__(self, key):
-        return self.__map[self.__remap[key]]
+        return self._map[self._remap[key]]
 
     def __iter__(self):
-        return iter(k for k, v in self.__remap.items() if v in self.__map)
+        return iter(k for k, v in self._remap.items())
 
     def __len__(self):
         return len(list(iter(self)))
 
     def __contains__(self, key):
-        return key in self.__remap and self.__remap[key] in self.__map
+        return key in self._remap and self._remap[key] in self._map
+
+
+class PartialReMappingProxy(ReMappingProxy):
+    """
+    A version of the ReMappingProxy where the iterator will skip over
+    any remap keys whoes value is a key that is absent in the provided
+    mapping.
+    """
+
+    def __iter__(self):
+        return iter(k for k, v in self._remap.items() if v in self._map)
 
 
 class BaseResourceDefinition(object):
@@ -561,7 +583,7 @@ class BaseEndpointDefinition(object):
     for all EndpointDefinition types.
     """
 
-    def __init__(self, provider, root, locals_bindings, environment):
+    def __init__(self, provider, root, kwargs_mapping, environment):
         """
         Arguments:
 
@@ -574,19 +596,29 @@ class BaseEndpointDefinition(object):
             in the environment, so that it may be joined together with
             the path defined for this endpoint for the full path where
             the data produced by the provider may be written to.
-        locals_bindings
-            This defines a mapping of endpoint local keys to execution
-            locals keys, such that a local mapping will be able to
-            capture all the required key-value definitions that may be
-            passed to the the provider callable via a singular mapping.
+        kwargs_mapping
+            This defines an additional key-value mapping that will be
+            passed to the provider, where the key will be the key in the
+            kwarg, and the value will be used as a key on the endpoint
+            execution locals to resolve the actual value from there;
+            this essentially provide the final level of indirection to
+            the underlying values available in the execution locals so
+            that resource definitions and/or other values may be defined
+            and the specified provider will be used in a way that is
+            specific to this endpoint.
+
+            Any unmapped/unspecified values will be resolved normally.
         environment
             The mapping of an environment variables specific to this
             endpoint definition.
         """
 
+        # the name will be referenced by the endpoint execution locals
+        # resolver to allow the kwarg_mapping to be applied.
+        self.name = provider
         self.provider = attrgetter(provider)
         self.root = root
-        self.locals_bindings = locals_bindings
+        self.kwargs_mapping = kwargs_mapping
         self.environment = environment
 
 
@@ -618,14 +650,12 @@ class BaseEndpointDefinitionMapping(BasePreparedMapping):
     stored data produced by the provider may be resolved at the level
     of the endpoint set).
 
-    Additionally, __dict__ may be used to specify a set of key-value
+    Additionally, __kwargs__ may be used to specify a set of key-value
     pairs, where the key will be the name of the new binding, and value
     being the key that may be found in the execution locals.  The intent
-    of this mapping is to provide a way to construct a limited view to
-    the execution locals that will then be passed to the provider, with
-    the required keys needed by that handler refernceing the actual
-    value which may be assigned to a different key inside the execution
-    locals.
+    of this mapping is to provide a more cohesive way to map a key
+    available within this endpoint definition to the one defined at some
+    common top level resource entry, to allow better usage.
 
     This base class makes no assumption as to how the assignment and/or
     retrieval should proceed, i.e. whether the assignments are fully
@@ -640,15 +670,15 @@ class BaseEndpointDefinitionMapping(BasePreparedMapping):
 
     @classmethod
     def create_endpoint_definition(
-            cls, provider, root, locals_bindings, environment):
+            cls, provider, root, kwargs_mapping, environment):
         return cls.EndpointDefinition(
-            provider, root, locals_bindings, environment)
+            provider, root, kwargs_mapping, environment)
 
     @classmethod
     def prepare_from_value(cls, value):
         environment = dict(value)
         provider = environment.pop('__provider__', None)
-        locals_bindings = environment.pop('__dict__', {})
+        kwargs_mapping = environment.pop('__kwargs__', {})
         # The __root__ key is not enforced by default; this is up to the
         # actual application runner to deal with and/or make use of.
         root = environment.pop('__root__', None)
@@ -657,7 +687,7 @@ class BaseEndpointDefinitionMapping(BasePreparedMapping):
             raise ValueError('__provider__ must be defined')
 
         return cls.create_endpoint_definition(
-            provider, root, locals_bindings, environment)
+            provider, root, kwargs_mapping, environment)
 
 
 class EndpointDefinitionMapping(
@@ -932,14 +962,48 @@ class ExecutionLocals(FlatGroupedMapping, AttributeMapping):
     definitions using values provided by itself.
     """
 
+    def process_resource_definition(self, resource_definition):
+        return resource_definition(vars_=self)()
+
     def __getitem__(self, key):
         # TODO use some kind of threadlocal to track keys retrieved?
         # TODO static version?
         value = super().__getitem__(key)
         if isinstance(value, BaseResourceDefinition):
-            return value(vars_=self)()
+            return self.process_resource_definition(value)
         else:
             return value
+
+
+class EndpointExecutionLocals(ExecutionLocals):
+    """
+    An execution locals specific to an endpoint, such that the kwargs
+    mapping defined for it will come into effect.
+    """
+
+    def __init__(self, mappings, endpoint):
+        super().__init__(mappings)
+        self.__endpoint = endpoint
+
+    def process_resource_definition(self, resource_definition):
+        if resource_definition.name != self.__endpoint.name:
+            return super().process_resource_definition(resource_definition)
+        return resource_definition(vars_=self)(
+            **ReMappingProxy(self.__endpoint.kwargs_mapping, self))
+        # not applying the endpoint mapping to any other fields and if
+        # no kwargs_mapping are available.
+
+    # If the kwargs mapping is to be processed as if they are additional
+    # entries for the execution __dict__, the following would be the
+    # implementation.
+    #
+    # def process_resource_definition(self, resource_definition):
+    #     if resource_definition.name == self.__endpoint.name:
+    #         return super().process_resource_definition(resource_definition)
+    #     return resource_definition(vars_=ExecutionLocals([
+    #         ReMappingProxy(self.__endpoint.kwargs_mapping, self),
+    #         self,
+    #     ]))()
 
 
 class Execution(object):
@@ -963,22 +1027,16 @@ class Execution(object):
             additional mapping of values destructured from the url.
         """
 
-        def re_mapping_proxy():
-            if endpoint.locals_bindings:
-                return ReMappingProxy(endpoint.locals_bindings, self.locals)
-            raise KeyError('no __dict__')
-
         self.endpoint = endpoint
         self.environment = environment
         self.resources = resources
         self.endpoint_mapping = endpoint_mapping
-        self.locals = ExecutionLocals([
-            DeferredComputedMapping(__dict__=re_mapping_proxy),
+        self.locals = EndpointExecutionLocals([
             endpoint.environment,
             environment,
             resources,
             dict(endpoint_mapping),
-        ])
+        ], endpoint)
 
     def __call__(self):
         """

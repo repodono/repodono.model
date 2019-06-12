@@ -18,6 +18,7 @@ from repodono.model.base import (
     FlatGroupedMapping,
     ObjectInstantiationMapping,
     ReMappingProxy,
+    PartialReMappingProxy,
     ResourceDefinitionMapping,
     BaseBucketDefinition,
     BucketDefinitionMapping,
@@ -616,7 +617,7 @@ class ReMappingProxyTestCase(unittest.TestCase):
 
     def test_empty_mapping(self):
         mapping = ReMappingProxy({'local': 'external'}, {})
-        self.assertEqual(len(mapping), 0)
+        self.assertEqual(len(mapping), 1)
         self.assertNotIn('local', mapping)
         self.assertNotIn('external', mapping)
 
@@ -626,6 +627,97 @@ class ReMappingProxyTestCase(unittest.TestCase):
             'external2': 'value2',
         }
         mapping = ReMappingProxy({
+            'internal1': 'external1',
+            'internal2': 'external2',
+            'internal3': 'external3',
+        }, base)
+        self.assertIn('internal1', mapping)
+        self.assertIn('internal2', mapping)
+        self.assertNotIn('internal3', mapping)
+        self.assertEqual(list(mapping), [
+            'internal1', 'internal2', 'internal3'])
+        self.assertEqual(mapping['internal1'], 'value1')
+        self.assertEqual(mapping['internal2'], 'value2')
+
+        with self.assertRaises(KeyError):
+            mapping['internal3']
+
+        self.assertEqual(len(mapping), 3)
+        base.update({
+            'external3': 'value3',
+            'external4': 'value4',
+        })
+        self.assertEqual(len(mapping), 3)
+        self.assertIn('internal3', mapping)
+        self.assertEqual(list(mapping), [
+            'internal1', 'internal2', 'internal3'])
+
+    def test_proxying_many_to_one(self):
+        value1 = object()
+        value2 = object()
+        base = {
+            'external1': value1,
+        }
+        mapping = ReMappingProxy({
+            'internal1': 'external1',
+            'internal2': 'external1',
+            'internal3': 'external1',
+            'internal4': 'external2',
+            'internal5': 'external2',
+            'internal6': 'external2',
+        }, base)
+        self.assertIn('internal1', mapping)
+        self.assertIn('internal2', mapping)
+        self.assertIn('internal3', mapping)
+        self.assertEqual(list(mapping), [
+            'internal1', 'internal2', 'internal3',
+            'internal4', 'internal5', 'internal6',
+        ])
+        self.assertIs(mapping['internal1'], value1)
+        self.assertIs(mapping['internal2'], value1)
+        self.assertIs(mapping['internal3'], value1)
+        # length is based completely on the remap.
+        self.assertEqual(len(mapping), 6)
+        base['external2'] = value2
+        # likewise here.
+        self.assertEqual(len(mapping), 6)
+        self.assertEqual(list(mapping), [
+            'internal1', 'internal2', 'internal3',
+            'internal4', 'internal5', 'internal6',
+        ])
+        self.assertEqual(dict(mapping), {
+            'internal1': value1,
+            'internal2': value1,
+            'internal3': value1,
+            'internal4': value2,
+            'internal5': value2,
+            'internal6': value2,
+        })
+
+
+class PartialReMappingProxyTestCase(unittest.TestCase):
+
+    def test_empty(self):
+        mapping = PartialReMappingProxy({}, {})
+        self.assertEqual(len(mapping), 0)
+
+    def test_empty_remap(self):
+        mapping = PartialReMappingProxy({}, {'thing': 'other'})
+        self.assertEqual(len(mapping), 0)
+        self.assertNotIn('thing', mapping)
+
+    def test_empty_mapping(self):
+        mapping = PartialReMappingProxy({'local': 'external'}, {})
+        self.assertEqual(len(mapping), 0)
+        self.assertNotIn('local', mapping)
+        self.assertNotIn('external', mapping)
+
+    def test_proxying_one_to_one(self):
+        base = {
+            'external1': 'value1',
+            'external2': 'value2',
+        }
+        mapping = PartialReMappingProxy({
             'internal1': 'external1',
             'internal2': 'external2',
             'internal3': 'external3',
@@ -652,7 +744,7 @@ class ReMappingProxyTestCase(unittest.TestCase):
         base = {
             'external1': value1,
         }
-        mapping = ReMappingProxy({
+        mapping = PartialReMappingProxy({
             'internal1': 'external1',
             'internal2': 'external1',
             'internal3': 'external1',
@@ -1028,14 +1120,14 @@ class EndpointDefinitionMappingTestCase(unittest.TestCase):
         definition = mapping['/some/path/{id}']
         # for the mean time, this would be unspecified.
         self.assertIsNone(definition.root)
-        self.assertEqual(definition.locals_bindings, {})
+        self.assertEqual(definition.kwargs_mapping, {})
 
     def test_basic_creation(self):
         mapping = EndpointDefinitionMapping({
             '/some/path/{id}': {
                 '__provider__': 'some_provider',
                 '__root__': 'some_root',
-                '__dict__': {
+                '__kwargs__': {
                     'local_key', 'execution_key',
                 },
                 'key': 'some_value',
@@ -1050,7 +1142,7 @@ class EndpointDefinitionMappingTestCase(unittest.TestCase):
         self.assertTrue(isinstance(definition.provider, attrgetter))
         self.assertIs(definition.provider(demo), provider)
         self.assertEqual(definition.root, 'some_root')
-        self.assertEqual(definition.locals_bindings, {
+        self.assertEqual(definition.kwargs_mapping, {
             'local_key', 'execution_key',
         })
         self.assertEqual(definition.environment, {

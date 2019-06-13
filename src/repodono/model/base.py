@@ -196,13 +196,16 @@ class AttributeMapping(Mapping):
         try:
             result = self.__getitem__(attr)
         except KeyError:
-            pass
+            # while a missing '_' prefixed attribute will also have this
+            # message, it is useful to include all previous exceptions
+            # that triggered this.
+            raise AttributeError("'%s' object has no attribute '%s'" % (
+                type(self).__name__, attr))
         else:
             if not attr.startswith('_'):
                 return result
-
         raise AttributeError("'%s' object has no attribute '%s'" % (
-            type(self).__name__, attr)) from None
+            type(self).__name__, attr))
 
 
 class BasePreparedMapping(BaseMapping):
@@ -988,10 +991,18 @@ class EndpointExecutionLocals(ExecutionLocals):
     def process_resource_definition(self, resource_definition):
         if resource_definition.name != self.__endpoint.name:
             return super().process_resource_definition(resource_definition)
-        return resource_definition(vars_=self)(
-            **ReMappingProxy(self.__endpoint.kwargs_mapping, self))
-        # not applying the endpoint mapping to any other fields and if
-        # no kwargs_mapping are available.
+        return resource_definition(vars_=ExecutionLocals([
+            self,
+            # assign a stub NotImplemented to every references for every
+            # key that have been provided by the endpoint kwargs_mapping
+            # in a secondary mapping, such that resolution of the
+            # "actual" value for the construction of the partial can
+            # complete, and the subsequent immediate invocation here
+            # will provide the keyword remapping that _should_ include
+            # the specified kwargs.
+            {v: NotImplemented for k, v in resource_definition.kwargs.items()
+                if k in self.__endpoint.kwargs_mapping},
+        ]))(**ReMappingProxy(self.__endpoint.kwargs_mapping, self))
 
     # If the kwargs mapping is to be processed as if they are additional
     # entries for the execution __dict__, the following would be the

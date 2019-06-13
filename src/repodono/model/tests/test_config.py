@@ -494,3 +494,99 @@ class ConfigIntegrationTestCase(unittest.TestCase):
         with self.assertRaises(KeyError) as e:
             exe.locals['a_mock']
         self.assertEqual(e.exception.args[0], 'no_such_thing')
+
+    def test_resource_missing_kwargs_provided_endpoint(self):
+        # Test out the resource definition that did not define a
+        # required argument with a reference, but then the provider has
+        # provided one.
+
+        config = Configuration.from_toml("""
+        [environment.variables]
+        some_name = "the value"
+
+        [bucket._]
+        __roots__ = ['somewhere']
+        accept = ["*/*"]
+
+        # A common shared mock object
+        [[resource."/"]]
+        __name__ = "thing"
+        __init__ = "repodono.model.testing:Thing"
+
+        [endpoint._."/entry/"]
+        # the template is fixed, but to test this thing out the kwargs
+        # can be remapped using the __kwargs__ key
+        __provider__ = "thing"
+        __kwargs__.path = "some_name"
+
+        [endpoint._."/entry/view"]
+        # the provider is simply the value, but for this test the locals
+        # will be requested from here but will test deferencing the
+        # above.
+        __provider__ = "some_name"
+        """)
+
+        exe = config.request_execution('/entry/', {})
+        self.assertEqual(exe.locals['thing'].path, 'the value')
+        # this would have simply access the value like above also
+        self.assertEqual(exe().path, 'the value')
+
+        # this other view did not directly inititate or provide a value
+        other_exe = config.request_execution('/entry/view', {})
+        with self.assertRaises(TypeError):
+            other_exe.locals['thing']
+
+    def test_resource_referenced_kwargs_to_be_provided(self):
+        # Test out the resource definition that specified a required
+        # keyword argument with a reference, but then that reference is
+        # to be defined later.
+
+        config = Configuration.from_toml("""
+        [environment.variables]
+        some_name = "the value"
+
+        [bucket._]
+        __roots__ = ['somewhere']
+        accept = ["*/*"]
+
+        # A common shared mock object
+        [[resource."/"]]
+        __name__ = "thing"
+        __init__ = "repodono.model.testing:Thing"
+        path = "some_reference"
+
+        [endpoint._."/entry/"]
+        # the template is fixed, but to test this thing out the kwargs
+        # can be remapped using the __kwargs__ key
+        __provider__ = "thing"
+        __kwargs__.path = "some_name"
+
+        [endpoint._."/entry/other"]
+        # this endpoint will also make use of thing, but it defines a
+        # static reference as a endpoint environment value
+        __provider__ = "thing"
+        some_reference = "static_value"
+
+        [endpoint._."/entry/both"]
+        # this endpoint has the required reference provided, but will
+        # have a specific kwargs specified
+        __provider__ = "thing"
+        __kwargs__.path = "some_name"
+        some_reference = "static_value"
+        """)
+
+        # check the other thing first, show that this typical creation
+        # is not impeded.
+        other_exe = config.request_execution('/entry/other', {})
+        self.assertEqual(other_exe.locals['thing'].path, 'static_value')
+
+        # now for the amin test, show that the path in kwargs will make
+        # a reference to some_name, and where some_name is from the root
+        # environment; note that 'some_reference' is not defined in this
+        # set of execution locals.
+        exe = config.request_execution('/entry/', {})
+        self.assertEqual(exe().path, 'the value')
+
+        both_exe = config.request_execution('/entry/both', {})
+        # the one provided by kwargs will take precedence.
+        self.assertEqual(both_exe().path, 'the value')

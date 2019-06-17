@@ -611,13 +611,13 @@ class ConfigIntegrationTestCase(unittest.TestCase):
 
         [localmap."/entry/"]
         key = "some_name"
-        # some_map.key1 = "some_name"
-        # some_map.key2 = "some_name"
+        some_map.key1 = "some_name"
+        some_map.key2 = "some_name"
 
         [endpoint._."/entry/"]
         __provider__ = "a_mock"
         __kwargs__.arg1 = "key"
-        # __kwargs__.arg2 = "some_map"
+        __kwargs__.arg2 = "some_map"
 
         [endpoint._."/entry/other"]
         # this endpoint will be invalid as the localmap entry would not
@@ -628,12 +628,10 @@ class ConfigIntegrationTestCase(unittest.TestCase):
 
         exe = config.request_execution('/entry/', {})
         self.assertEqual(exe().arg1, 'the value')
-        # TODO figure out whether to support nested structures
-        # XXX probably do, but need to figure what
-        # self.assertEqual(exe().key2, {
-        #     'key1': 'the value',
-        #     'key2': 'the value',
-        # })
+        self.assertEqual(exe().arg2, {
+            'key1': 'the value',
+            'key2': 'the value',
+        })
 
         # check the other thing first, show that this typical creation
         # is not impeded.

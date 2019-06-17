@@ -1081,7 +1081,8 @@ class EndpointExecutionLocals(ExecutionLocals):
         self.__remap = remap
 
     def process_resource_definition(self, resource_definition):
-        vars_ = ExecutionLocals([ReMappingProxy(self.__remap, self), self])
+        vars_ = ExecutionLocals([
+            MultiReMappingProxy(self.__remap, self), self])
         if resource_definition.name != self.__endpoint.name:
             return resource_definition(vars_=vars_)()
         return resource_definition(

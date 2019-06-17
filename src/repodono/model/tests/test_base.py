@@ -19,6 +19,7 @@ from repodono.model.base import (
     ObjectInstantiationMapping,
     ReMappingProxy,
     PartialReMappingProxy,
+    MultiReMappingProxy,
     ResourceDefinitionMapping,
     BaseBucketDefinition,
     BucketDefinitionMapping,
@@ -779,6 +780,47 @@ class PartialReMappingProxyTestCase(unittest.TestCase):
             'internal5': value2,
             'internal6': value2,
         })
+
+
+class MultiReMappingProxyTestCase(unittest.TestCase):
+
+    def test_empty(self):
+        mapping = MultiReMappingProxy({}, {})
+        self.assertEqual(len(mapping), 0)
+
+    def test_empty_remap(self):
+        mapping = MultiReMappingProxy({}, {'thing': 'other'})
+        self.assertEqual(len(mapping), 0)
+        self.assertNotIn('thing', mapping)
+
+    def test_nested_remap(self):
+        mapping = MultiReMappingProxy(remap={
+            'local': 'external',
+            'nested': {
+                'foo': 'external_foo',
+                'bar': 'external_bar',
+                'baz': 'external_baz',
+                'level2': {
+                    'final': 'external',
+                }
+            }
+        }, mapping={
+            'external': 'E',
+            'external_foo': 'F',
+            'external_bar': 'B',
+            'external_baz': 'Z',
+        })
+        self.assertEqual(len(mapping), 2)
+        self.assertEqual(len(mapping['nested']), 4)
+        self.assertEqual(mapping['nested']['foo'], 'F')
+        self.assertEqual(mapping['nested']['level2']['final'], 'E')
+        # iteration
+        self.assertEqual(sorted(mapping), ['local', 'nested'])
+        # membership
+        self.assertIn('local', mapping)
+        self.assertIn('nested', mapping)
+        self.assertNotIn('not_present', mapping)
+        self.assertIn('foo', mapping['nested'])
 
 
 class BaseResourceDefinitionTestCase(unittest.TestCase):

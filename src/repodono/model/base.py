@@ -315,7 +315,10 @@ class ReMappingProxy(Mapping):
     """
 
     def __init__(self, remap, mapping):
-        self.__map = MappingProxyType(mapping)
+        self.__map = (
+            mapping if isinstance(mapping, MappingProxyType) else
+            MappingProxyType(mapping)
+        )
         self.__remap = MappingProxyType(dict(remap))
 
     @property
@@ -348,6 +351,25 @@ class PartialReMappingProxy(ReMappingProxy):
 
     def __iter__(self):
         return iter(k for k, v in self._remap.items() if v in self._map)
+
+
+class MultiReMappingProxy(ReMappingProxy):
+    """
+    A version of the ReMappingProxy where any remap values that is an
+    instance of dict it will return a new instance of a type of itself
+    with that value as a new type.
+    """
+
+    def __getitem__(self, key):
+        if isinstance(self._remap[key], Mapping):
+            return type(self)(self._remap[key], self._map)
+        return super().__getitem__(key)
+
+    def __contains__(self, key):
+        return key in self._remap and (
+            isinstance(self._remap[key], Mapping) or
+            self._remap[key] in self._map
+        )
 
 
 class BaseResourceDefinition(object):

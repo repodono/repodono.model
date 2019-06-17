@@ -23,6 +23,7 @@ from repodono.model.base import (
     BaseBucketDefinition,
     BucketDefinitionMapping,
     EndpointDefinitionMapping,
+    ReMappingDefinitionMapping,
     RouteTrieMapping,
     structured_mapper,
     StructuredMapping,
@@ -1148,6 +1149,28 @@ class EndpointDefinitionMappingTestCase(unittest.TestCase):
         self.assertEqual(definition.environment, {
             'key': 'some_value',
             'target': 'some_other_value',
+        })
+
+
+class ReMappingDefinitionMappingTestCase(unittest.TestCase):
+
+    def test_basic_creation(self):
+        mapping = ReMappingDefinitionMapping({
+            '/some/path/{id}': {
+                'key': 'some_value',
+                'target': 'some_other_value',
+                'nested': {
+                    'somekey': "with_nested_value"
+                }
+            }
+        })
+        definition = mapping['/some/path/{id}']
+        self.assertEqual(definition.remap, {
+            'key': 'some_value',
+            'target': 'some_other_value',
+            'nested': {
+                'somekey': "with_nested_value"
+            },
         })
 
 

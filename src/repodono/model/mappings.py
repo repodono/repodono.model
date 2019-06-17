@@ -10,6 +10,7 @@ from repodono.model.base import (
     ObjectInstantiationMapping,
     ResourceDefinitionMapping,
     BucketDefinitionMapping,
+    ReMappingDefinitionMapping,
     EndpointDefinitionSetMapping,
 )
 
@@ -45,6 +46,17 @@ class Bucket(StructuredMapping((
 
     [[Bucket]]
     bucket = "repodono.model.base:BucketDefinitionMapping"
+    """
+
+
+class Localmap(StructuredMapping((
+    ('localmap', ReMappingDefinitionMapping,),
+))):
+    """
+    Default local mapping implementation (provides remap proxy)
+
+    [[Localmap]]
+    localmap = "repodono.model.base:ReMappingDefinitionMapping"
     """
 
 

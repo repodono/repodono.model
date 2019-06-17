@@ -13,6 +13,7 @@ from repodono.model.base import (
 from repodono.model.mappings import (
     Environment,
     Bucket,
+    Localmap,
     Resource,
     Endpoint,
 )
@@ -51,6 +52,7 @@ class Configuration(BaseConfiguration):
         super().__init__(config_mapping)
         self.environment = Environment(self)
         self.bucket = Bucket(self)
+        self.localmap = Localmap(self)
         self.resource = Resource(self)
         self.endpoint = Endpoint(self)
         self.compile()
@@ -114,7 +116,12 @@ class Configuration(BaseConfiguration):
         # This currently raises a simple KeyError
         endpoint = self.route_bucket_endpoint_resolver(route, bucket_mapping)
         resources = self.compiled_route_resources[route]
-        return execution_class(endpoint, self.environment, resources, mapping)
+        # the remapping is only needed if localmap has an entry defined
+        # for this route.
+        remap_mapping = (
+            self.localmap[route].remap if route in self.localmap else {})
+        return execution_class(
+            endpoint, self.environment, resources, mapping, remap_mapping)
 
     def route_bucket_endpoint_resolver(self, route, bucket_mapping={}):
         """

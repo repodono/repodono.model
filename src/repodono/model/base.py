@@ -365,10 +365,21 @@ class BaseResourceDefinition(object):
         yield self.name
         yield self
 
-    def __call__(self, vars_, **kwargs):
+    def __call__(self, vars_, omit_keys=(), kwargs={}):
         """
         Prepares a callable object that can be invoked immediately
         with the required definitions.
+
+        Arguments:
+
+        vars_
+            The incoming mapping
+        omit_keys
+            Omit the following keys from the kwargs from the partial to
+            be returned.
+        kwargs
+            Additional kwargs (as a dict) to be provided into the
+            returned partial.
         """
 
         if isinstance(self.call, attrgetter):
@@ -378,13 +389,17 @@ class BaseResourceDefinition(object):
         else:
             call = map_vars_value(self.call, vars_)
 
-        kwargs.update(map_vars_value(self.kwargs, vars_))
+        omit = set(omit_keys)
+
+        final_kwargs = map_vars_value({
+            k: v for k, v in self.kwargs.items() if k not in omit}, vars_)
+        final_kwargs.update(kwargs)
         # XXX this does NOT actually trigger the assignment to
         # vars_[self.name], as the current definition on how the
         # protocol works is not yet defined; it may be possible to
         # encapsulate the Environment in a submapping representing
         # some RuntimeEnvironment for the actual usage.
-        return partial(call, **kwargs)
+        return partial(call, **final_kwargs)
 
 
 class BaseResourceDefinitionMapping(BasePreparedMapping):
@@ -493,7 +508,7 @@ class BaseBucketDefinition(object):
 
     def match(self, mapping):
         """
-        Return True if the provide keyword arguments are all found
+        Return a score if the provide keyword arguments are all found
         inside the environment mapping.
         """
 
@@ -578,6 +593,60 @@ class BucketDefinitionMapping(
             (bucket.match(mapping), (key, bucket))
             for key, bucket in self.items()) if score), reverse=True)
         return key_buckets if key_buckets else [(_, self[_])]
+
+
+class BaseReMappingDefinition(object):
+    """
+    The BaseReMappingDefinition class.  More of a marker/common ancestor
+    for all ReMappingDefinition types.
+    """
+
+    def __init__(self, remap):
+        """
+        Arguments
+
+        remap
+            The remap argument to be passed to some proxy mapping
+            implementation.
+        """
+
+        self.remap = remap
+
+
+class BaseReMappingDefinitionMapping(BasePreparedMapping):
+    """
+    This defines the base remapping definition mapping, where the value
+    assigned should be a mapping suitable for the remapping proxy.
+    """
+
+    # internal class structure similar to the resource definition
+    # version for the mean time.
+
+    class ReMappingDefinition(BaseReMappingDefinition):
+        pass
+
+    @classmethod
+    def create_remapping_definition(cls, remap):
+        return cls.ReMappingDefinition(remap)
+
+    @classmethod
+    def prepare_from_value(cls, value):
+        remap = dict(value)
+        return cls.create_remapping_definition(remap)
+
+
+class ReMappingDefinitionMapping(
+        BaseReMappingDefinitionMapping, PreparedMapping):
+    """
+    This defines a mapping specific to each endpoint definition that
+    will be used as a way to remap assignments to a structure that
+    resembles this mapping.  This is typically achieved using the
+    ReMappingProxy class.
+    """
+
+    # TODO figure out how to make this class a parameter/argument/
+    # attribute somewhere that may be specified by some users such that
+    # the default __call__ will generate the remapping proxy object.
 
 
 class BaseEndpointDefinition(object):
@@ -984,37 +1053,18 @@ class EndpointExecutionLocals(ExecutionLocals):
     mapping defined for it will come into effect.
     """
 
-    def __init__(self, mappings, endpoint):
+    def __init__(self, mappings, endpoint, remap):
         super().__init__(mappings)
         self.__endpoint = endpoint
+        self.__remap = remap
 
     def process_resource_definition(self, resource_definition):
+        vars_ = ExecutionLocals([ReMappingProxy(self.__remap, self), self])
         if resource_definition.name != self.__endpoint.name:
-            return super().process_resource_definition(resource_definition)
-        return resource_definition(vars_=ExecutionLocals([
-            self,
-            # assign a stub NotImplemented to every references for every
-            # key that have been provided by the endpoint kwargs_mapping
-            # in a secondary mapping, such that resolution of the
-            # "actual" value for the construction of the partial can
-            # complete, and the subsequent immediate invocation here
-            # will provide the keyword remapping that _should_ include
-            # the specified kwargs.
-            {v: NotImplemented for k, v in resource_definition.kwargs.items()
-                if k in self.__endpoint.kwargs_mapping},
-        ]))(**ReMappingProxy(self.__endpoint.kwargs_mapping, self))
-
-    # If the kwargs mapping is to be processed as if they are additional
-    # entries for the execution __dict__, the following would be the
-    # implementation.
-    #
-    # def process_resource_definition(self, resource_definition):
-    #     if resource_definition.name == self.__endpoint.name:
-    #         return super().process_resource_definition(resource_definition)
-    #     return resource_definition(vars_=ExecutionLocals([
-    #         ReMappingProxy(self.__endpoint.kwargs_mapping, self),
-    #         self,
-    #     ]))()
+            return resource_definition(vars_=vars_)()
+        return resource_definition(
+            vars_=vars_, omit_keys=self.__endpoint.kwargs_mapping.keys(),
+        )(**ReMappingProxy(self.__endpoint.kwargs_mapping, vars_))
 
 
 class Execution(object):
@@ -1023,7 +1073,9 @@ class Execution(object):
     of an application.
     """
 
-    def __init__(self, endpoint, environment, resources, endpoint_mapping):
+    def __init__(
+            self, endpoint, environment, resources, endpoint_mapping,
+            remap_mapping):
         """
         Arguments:
 
@@ -1036,6 +1088,8 @@ class Execution(object):
             endpoint.
         endpoint_mapping
             additional mapping of values destructured from the url.
+        remap_mapping
+            additional remap
         """
 
         self.endpoint = endpoint
@@ -1047,7 +1101,7 @@ class Execution(object):
             environment,
             resources,
             dict(endpoint_mapping),
-        ], endpoint)
+        ], endpoint, remap_mapping)
 
     def __call__(self):
         """

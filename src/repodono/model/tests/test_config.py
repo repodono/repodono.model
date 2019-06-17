@@ -580,7 +580,7 @@ class ConfigIntegrationTestCase(unittest.TestCase):
         other_exe = config.request_execution('/entry/other', {})
         self.assertEqual(other_exe.locals['thing'].path, 'static_value')
 
-        # now for the amin test, show that the path in kwargs will make
+        # now for the main test, show that the path in kwargs will make
         # a reference to some_name, and where some_name is from the root
         # environment; note that 'some_reference' is not defined in this
         # set of execution locals.
@@ -590,3 +590,53 @@ class ConfigIntegrationTestCase(unittest.TestCase):
         both_exe = config.request_execution('/entry/both', {})
         # the one provided by kwargs will take precedence.
         self.assertEqual(both_exe().path, 'the value')
+
+    def test_localmap(self):
+        # Test out the resource definition that specified a required
+        # keyword argument with a reference, but then that reference is
+        # to be defined later.
+
+        config = Configuration.from_toml("""
+        [environment.variables]
+        some_name = "the value"
+
+        [bucket._]
+        __roots__ = ['somewhere']
+        accept = ["*/*"]
+
+        # A common shared mock object
+        [[resource."/"]]
+        __name__ = "a_mock"
+        __init__ = "unittest.mock:Mock"
+
+        [localmap."/entry/"]
+        key = "some_name"
+        # some_map.key1 = "some_name"
+        # some_map.key2 = "some_name"
+
+        [endpoint._."/entry/"]
+        __provider__ = "a_mock"
+        __kwargs__.arg1 = "key"
+        # __kwargs__.arg2 = "some_map"
+
+        [endpoint._."/entry/other"]
+        # this endpoint will be invalid as the localmap entry would not
+        # apply here.
+        __provider__ = "a_mock"
+        __kwargs__.arg1 = "key"
+        """)
+
+        exe = config.request_execution('/entry/', {})
+        self.assertEqual(exe().arg1, 'the value')
+        # TODO figure out whether to support nested structures
+        # XXX probably do, but need to figure what
+        # self.assertEqual(exe().key2, {
+        #     'key1': 'the value',
+        #     'key2': 'the value',
+        # })
+
+        # check the other thing first, show that this typical creation
+        # is not impeded.
+        other_exe = config.request_execution('/entry/other', {})
+        with self.assertRaises(KeyError):
+            other_exe.locals['a_mock']

@@ -842,7 +842,8 @@ class ObjectInstantiationMapping(PreparedMapping):
         # TODO if value is of a BaseResourceDefinition...
         kwargs = dict(value)
         if '__init__' not in kwargs:
-            raise ValueError("incoming mapping missing the '__init__' key")
+            raise ValueError(
+                "provided object mapping missing the '__init__' key")
         entry = EntryPoint.parse('target=' + kwargs.pop('__init__'))
         target = entry.resolve()
         kwargs = {
@@ -1076,18 +1077,18 @@ class EndpointExecutionLocals(ExecutionLocals):
     """
 
     def __init__(self, mappings, endpoint, remap):
-        super().__init__(mappings)
         self.__endpoint = endpoint
         self.__remap = remap
+        super().__init__(mappings + [
+            MultiReMappingProxy(self.__remap, self),
+        ])
 
     def process_resource_definition(self, resource_definition):
-        vars_ = ExecutionLocals([
-            MultiReMappingProxy(self.__remap, self), self])
         if resource_definition.name != self.__endpoint.name:
-            return resource_definition(vars_=vars_)()
+            return resource_definition(vars_=self)()
         return resource_definition(
-            vars_=vars_, omit_keys=self.__endpoint.kwargs_mapping.keys(),
-        )(**ReMappingProxy(self.__endpoint.kwargs_mapping, vars_))
+            vars_=self, omit_keys=self.__endpoint.kwargs_mapping.keys(),
+        )(**MultiReMappingProxy(self.__endpoint.kwargs_mapping, self))
 
 
 class Execution(object):

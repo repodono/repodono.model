@@ -444,6 +444,37 @@ class ConfigIntegrationTestCase(unittest.TestCase):
         self.assertEqual(exe.locals['a_mock'].mock_method, 'blah')
         self.assertEqual(exe.locals['a_mock'].mock_thing, 'env')
 
+    def test_endpoint_kwargs_nested_remap(self):
+        config = Configuration.from_toml("""
+        [environment.variables]
+        thing = "env"
+
+        [bucket._]
+        __roots__ = ['somewhere']
+        accept = ["*/*"]
+
+        # A common shared mock object
+        [[resource."/"]]
+        __name__ = "a_mock"
+        __init__ = "unittest.mock:Mock"
+
+        [endpoint._."/entry/{entry_id}/{action}"]
+        # the template is fixed, but to test this thing out the kwargs
+        # can be remapped using the __kwargs__ key
+        __provider__ = "a_mock"
+        __kwargs__.thing.mock_id = "entry_id"
+        __kwargs__.thing.mock_method = "action"
+        __kwargs__.thing.mock_thing = "thing"
+        """)
+
+        exe = config.request_execution('/entry/{entry_id}/{action}', {
+            'entry_id': '123',
+            'action': 'blah',
+        })
+        self.assertEqual(exe.locals['a_mock'].thing['mock_id'], '123')
+        self.assertEqual(exe.locals['a_mock'].thing['mock_method'], 'blah')
+        self.assertEqual(exe.locals['a_mock'].thing['mock_thing'], 'env')
+
     def test_endpoint_kwargs_shadowing(self):
         config = Configuration.from_toml("""
         [environment.variables]

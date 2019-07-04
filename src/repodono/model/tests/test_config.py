@@ -214,6 +214,31 @@ class ConfigIntegrationTestCase(unittest.TestCase):
         config = Configuration.from_toml(config_str)
         self.assertEqual(config['environment']['variables']['foo'], 'bar')
 
+    def test_environment_shadowing(self):
+        config_str = """
+        [environment.variables]
+        foo = 'bar'
+
+        [[environment.objects]]
+        __name__ = "foo"
+        __init__ = "repodono.model.testing:Thing"
+        path = "foo"
+
+        [bucket._]
+        __roots__ = ["foo"]
+
+        [endpoint._."/"]
+        __provider__ = "foo"
+        """
+
+        config = Configuration.from_toml(config_str)
+        self.assertEqual(config['environment']['variables']['foo'], 'bar')
+        # entry is defined.
+        self.assertEqual(
+            config['environment']['objects'][0]['__name__'], 'foo')
+        exe = config.request_execution('/', {})
+        self.assertEqual(exe.locals['foo'], 'bar')
+
     def test_compiled_details(self):
         root = TemporaryDirectory()
         self.addCleanup(root.cleanup)

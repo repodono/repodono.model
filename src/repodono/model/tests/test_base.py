@@ -605,6 +605,66 @@ class ObjectInstantiationMappingTestCase(unittest.TestCase):
         self.assertTrue(isinstance(results['target2'], Thing))
         self.assertEqual(results['target2'].path, marker)
 
+    def test_instantiation_order(self):
+        value = [{
+            '__name__': 'thing1',
+            '__init__': 'repodono.model.testing:Thing',
+            'path': 'thing0',
+        }, {
+            '__name__': 'thing2',
+            '__init__': 'repodono.model.testing:Thing',
+            'path': 'thing1',
+        }, {
+            '__name__': 'thing3',
+            '__init__': 'repodono.model.testing:Thing',
+            'path': 'thing2',
+        }]
+        thing0 = object()
+        vars_ = {'thing0': thing0}
+        result = ObjectInstantiationMapping(value, vars_)
+        self.assertTrue(isinstance(result['thing1'], Thing))
+        self.assertEqual(result['thing1'].path, thing0)
+        self.assertTrue(isinstance(result['thing2'], Thing))
+        self.assertEqual(result['thing2'].path, result['thing1'])
+        self.assertTrue(isinstance(result['thing3'], Thing))
+        self.assertEqual(result['thing3'].path, result['thing2'])
+
+    def test_instantiation_order_failure(self):
+        value = [{
+            '__name__': 'thing1',
+            '__init__': 'repodono.model.testing:Thing',
+            'path': 'thing2',
+        }, {
+            '__name__': 'thing2',
+            '__init__': 'repodono.model.testing:Thing',
+            'path': 'thing0',
+        }]
+        thing0 = object()
+        vars_ = {'thing0': thing0}
+
+        with self.assertRaises(KeyError):
+            ObjectInstantiationMapping(value, vars_)
+
+    def test_instantiation_redefinition_blocked(self):
+        value = [{
+            '__name__': 'thing0',
+            '__init__': 'repodono.model.testing:Thing',
+            'path': 'thing0',
+        }, {
+            '__name__': 'thing1',
+            '__init__': 'repodono.model.testing:Thing',
+            'path': 'thing0',
+        }]
+        thing0 = object()
+        vars_ = {'thing0': thing0}
+        result = ObjectInstantiationMapping(value, vars_)
+        # since in the system, environment values always have precedence
+        # over objects.
+        self.assertIsNot(result['thing0'], thing0)
+        self.assertIs(result['thing0'].path, thing0)
+        self.assertIsNot(result['thing1'].path, result['thing0'])
+        self.assertIs(result['thing1'].path, thing0)
+
 
 class ReMappingProxyTestCase(unittest.TestCase):
 

@@ -835,7 +835,7 @@ class ObjectInstantiationMapping(PreparedMapping):
         For a given mapping resolve the object and construct a mapping
         """
 
-        self.__vars = vars_
+        self.__vars = FlatGroupedMapping([vars_, self])
         super().__init__(items)
 
     def prepare_from_value(self, value):

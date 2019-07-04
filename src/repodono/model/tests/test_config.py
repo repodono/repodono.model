@@ -694,3 +694,60 @@ class ConfigIntegrationTestCase(unittest.TestCase):
         other_exe = config.request_execution('/entry/other', {})
         with self.assertRaises(KeyError):
             other_exe.locals['a_mock']
+
+    def test_execution_locals_shadowing(self):
+        config = Configuration.from_toml("""
+        [environment.variables]
+        value = "value"
+        target = "the target"
+
+        [bucket._]
+        __roots__ = ['somewhere']
+
+        # this should not be able to shadow the environment variables.
+        [[resource."/"]]
+        __name__ = "target"
+        __init__ = "repodono.model.testing:Die"
+
+        [[resource."/"]]
+        __name__ = "die"
+        __init__ = "repodono.model.testing:Die"
+
+        [endpoint._."/"]
+        __provider__ = "target"
+        """)
+
+        exe = config.request_execution('/', {})
+        self.assertEqual(exe.locals['target'], 'the target')
+
+        with self.assertRaises(Exception):
+            # just to ensure that this other definition will then
+            # trigger the loading.
+            exe.locals['die']
+
+    def test_execution_locals_resource_shadowing(self):
+        config = Configuration.from_toml("""
+        [environment.variables]
+        one = "one"
+        two = "two"
+
+        [bucket._]
+        __roots__ = ['somewhere']
+
+        [[resource."/"]]
+        __name__ = "thing"
+        __init__ = "repodono.model.testing:Thing"
+        path = "one"
+
+        # resource entries are shadowed in reverse order.
+        [[resource."/"]]
+        __name__ = "thing"
+        __init__ = "repodono.model.testing:Thing"
+        path = "two"
+
+        [endpoint._."/"]
+        __provider__ = "target"
+        """)
+
+        exe = config.request_execution('/', {})
+        self.assertEqual(exe.locals['thing'].path, 'two')

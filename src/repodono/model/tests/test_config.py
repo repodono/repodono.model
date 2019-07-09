@@ -769,3 +769,43 @@ class ConfigIntegrationTestCase(unittest.TestCase):
 
         exe = config.request_execution('/', {})
         self.assertEqual(exe.locals['thing'].path, 'two')
+
+    def test_execution_locals_default_shadowing(self):
+        config = Configuration.from_toml("""
+        [environment.variables]
+        one = "one"
+        two = "two"
+
+        [default.variables]
+        two = 2
+        three = 3
+
+        [bucket._]
+        __roots__ = ['somewhere']
+
+        [[resource."/"]]
+        __name__ = "thing"
+        __init__ = "repodono.model.testing:Thing"
+        path = "one"
+
+        # resource entries are shadowed in reverse order.
+        [[resource."/"]]
+        __name__ = "thing"
+        __init__ = "repodono.model.testing:Thing"
+        path = "two"
+
+        # resource entries are shadowed in reverse order.
+        [[resource."/"]]
+        __name__ = "default"
+        __init__ = "repodono.model.testing:Thing"
+        path = "three"
+
+        [endpoint._."/"]
+        __provider__ = "target"
+        """)
+
+        exe = config.request_execution('/', {})
+        # the default value should be shadows as environment has it
+        self.assertEqual(exe.locals['thing'].path, 'two')
+        # default value should be available
+        self.assertEqual(exe.locals['default'].path, 3)

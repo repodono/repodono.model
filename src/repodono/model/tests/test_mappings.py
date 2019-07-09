@@ -41,6 +41,31 @@ class MappingsTestCase(unittest.TestCase):
         self.assertEqual(environment['thing'].path, Path(root.name))
         self.assertTrue(isinstance(environment['thing'], Thing))
 
+    def test_default(self):
+        root = TemporaryDirectory()
+        self.addCleanup(root.cleanup)
+        default = mappings.Default({
+            'default': {
+                'variables': {
+                    'foo': 'bar',
+                    'bar': 'baz',
+                },
+                'paths': {
+                    'some_root': root.name,
+                },
+                'objects': [{
+                    '__name__': "thing",
+                    '__init__': "repodono.model.testing:Thing",
+                    'path': "some_root",
+                }],
+            }
+        })
+
+        self.assertEqual(default['foo'], 'bar')
+        self.assertEqual(default['some_root'], Path(root.name))
+        self.assertEqual(default['thing'].path, Path(root.name))
+        self.assertTrue(isinstance(default['thing'], Thing))
+
     def test_resource(self):
         resource = mappings.Resource({
             'resource': {

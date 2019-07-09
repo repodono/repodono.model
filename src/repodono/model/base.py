@@ -1098,7 +1098,7 @@ class Execution(object):
     """
 
     def __init__(
-            self, endpoint, environment, resources, endpoint_mapping,
+            self, endpoint, environment, default, resources, endpoint_mapping,
             remap_mapping):
         """
         Arguments:
@@ -1106,7 +1106,12 @@ class Execution(object):
         endpoint
             an instance of BaseEndpointDefinition
         environment
-            a mapping representing some base runtime environment
+            a mapping representing the primary mapping of environment
+            values in the runtime environment
+        default
+            a mapping representing the default mapping of values in
+            the runtime environment to be provided as a last resort
+            default value.
         resources
             the mapping of resources available resolved for the current
             endpoint.
@@ -1118,6 +1123,7 @@ class Execution(object):
 
         self.endpoint = endpoint
         self.environment = environment
+        self.default = default
         self.resources = resources
         self.endpoint_mapping = endpoint_mapping
         self.locals = EndpointExecutionLocals([
@@ -1125,6 +1131,7 @@ class Execution(object):
             environment,
             resources,
             dict(endpoint_mapping),
+            default,
         ], endpoint, remap_mapping)
 
     def __call__(self):

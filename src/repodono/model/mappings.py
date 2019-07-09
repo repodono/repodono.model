@@ -38,6 +38,32 @@ class Environment(StructuredMapping((
     """
 
 
+class Default(StructuredMapping((
+    ('default', StructuredMapping((
+        ('variables', BaseMapping,),
+        ('paths', PathMapping,),
+        ('objects', ObjectInstantiationMapping,),
+    ),),),
+))):
+    """
+    Default value implementation
+
+    Default global values; functionally similar to the environment,
+    but only simple variables are defined and have the lowest level of
+    precedence in the resolution order by the execution locals.  This is
+    essentially based on the Environment class, with a different name
+    and prefix.
+
+    [[Default]]
+    [[Default.default]]
+    variables = "repodono.model.base:BaseMapping"
+    [[Default.default]]
+    paths = "repodono.model.base:PathMapping"
+    [[Default.default]]
+    objects = "repodono.model.base:ObjectInstantiationMapping"
+    """
+
+
 class Bucket(StructuredMapping((
     ('bucket', BucketDefinitionMapping,),
 ))):

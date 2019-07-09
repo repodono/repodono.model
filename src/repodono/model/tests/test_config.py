@@ -90,22 +90,40 @@ class ConfigEnvironmentTestCase(unittest.TestCase):
         [environment.variables]
         text = "hello"
         number = 0
+        one = 1
         [environment.paths]
         base_root = %r
+
+        # The indentations are to indicate the relative associations
         [[environment.objects]]
         __name__ = "thing"
         __init__ = "repodono.model.testing:Thing"
-        [environment.objects.path]
-        path = "base_root"
-        number = "number"
-        texts = ["text", "text"]
+            [environment.objects.path]
+            path = "base_root"
+            number = "number"
+            texts = ["text", "text"]
+
+        [[environment.objects]]
+        __name__ = "other"
+        __init__ = "repodono.model.testing:Thing"
+            [environment.objects.path]
+            path = "base_root"
+            number = "one"
+            numbers = ["number", "one"]
         """ % (root.name,))
         env = config.environment
+
         self.assertEqual({
             'path': env['base_root'],
             'number': 0,
             'texts': ['hello', 'hello'],
         }, env['thing'].path)
+
+        self.assertEqual({
+            'path': env['base_root'],
+            'number': 1,
+            'numbers': [0, 1],
+        }, env['other'].path)
 
 
 class ConfigBucketTestCase(unittest.TestCase):

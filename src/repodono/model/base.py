@@ -1076,11 +1076,12 @@ class EndpointExecutionLocals(ExecutionLocals):
     mapping defined for it will come into effect.
     """
 
-    def __init__(self, mappings, endpoint, remap):
+    def __init__(self, mappings, endpoint, remap, default):
         self.__endpoint = endpoint
         self.__remap = remap
         super().__init__(mappings + [
             MultiReMappingProxy(self.__remap, self),
+            default,
         ])
 
     def process_resource_definition(self, resource_definition):
@@ -1131,8 +1132,7 @@ class Execution(object):
             environment,
             resources,
             dict(endpoint_mapping),
-            default,
-        ], endpoint, remap_mapping)
+        ], endpoint, remap_mapping, self.default)
 
     def __call__(self):
         """

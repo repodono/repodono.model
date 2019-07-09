@@ -41,6 +41,22 @@ class ConfigEnvironmentTestCase(unittest.TestCase):
         """ % (root.name,))
         self.assertTrue(isinstance(config.environment['thing'].path, Path))
 
+    def test_default_objects(self):
+        root = TemporaryDirectory()
+        self.addCleanup(root.cleanup)
+        config = Configuration.from_toml("""
+        [default.variables]
+        foo = "bar"
+        [default.paths]
+        base_root = %r
+        [[default.objects]]
+        __name__ = "thing"
+        __init__ = "repodono.model.testing:Thing"
+        path = "base_root"
+        """ % (root.name,))
+        self.assertTrue(isinstance(config.default['thing'].path, Path))
+        self.assertEqual(config.default['foo'], 'bar')
+
     def test_list_items_resolved(self):
         root = TemporaryDirectory()
         self.addCleanup(root.cleanup)
@@ -779,6 +795,7 @@ class ConfigIntegrationTestCase(unittest.TestCase):
         [default.variables]
         two = 2
         three = 3
+        four = 4
 
         [bucket._]
         __roots__ = ['somewhere']
@@ -800,6 +817,12 @@ class ConfigIntegrationTestCase(unittest.TestCase):
         __init__ = "repodono.model.testing:Thing"
         path = "three"
 
+        # resource entries are shadowed in reverse order.
+        [[resource."/"]]
+        __name__ = "four"
+        __init__ = "repodono.model.testing:Thing"
+        path = "three"
+
         [endpoint._."/"]
         __provider__ = "target"
         """)
@@ -809,3 +832,41 @@ class ConfigIntegrationTestCase(unittest.TestCase):
         self.assertEqual(exe.locals['thing'].path, 'two')
         # default value should be available
         self.assertEqual(exe.locals['default'].path, 3)
+        # had "four" defined at environment.variables, test fails here.
+        self.assertTrue(hasattr(exe.locals.four, 'path'))
+        self.assertNotEqual(exe.locals['four'], 4)
+
+    def test_localmap_default_shadowing(self):
+        config = Configuration.from_toml("""
+        [environment.variables]
+        some_name = "the value"
+
+        [default.variables]
+        some_map = {}
+
+        [bucket._]
+        __roots__ = ['somewhere']
+        accept = ["*/*"]
+
+        [localmap."/entry/"]
+        key = "some_name"
+        some_map.key1 = "some_name"
+        some_map.key2 = "some_name"
+
+        [endpoint._."/entry/"]
+        __provider__ = "a_mock"
+        __kwargs__.arg1 = "key"
+        __kwargs__.arg2 = "some_map"
+
+        [endpoint._."/entry/other"]
+        # this endpoint will be invalid as the localmap entry would not
+        # apply here.
+        __provider__ = "a_mock"
+        __kwargs__.arg1 = "key"
+        """)
+
+        exe = config.request_execution('/entry/', {})
+        self.assertEqual(exe.locals['some_map'], {
+            'key1': 'the value',
+            'key2': 'the value',
+        })

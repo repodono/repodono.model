@@ -729,11 +729,12 @@ class ConfigIntegrationTestCase(unittest.TestCase):
         with self.assertRaises(KeyError):
             other_exe.locals['a_mock']
 
-    def test_execution_locals_shadowing(self):
+    def test_execution_locals_shadowing_environment(self):
         config = Configuration.from_toml("""
         [environment.variables]
         value = "value"
         target = "the target"
+        one = "one"
 
         [bucket._]
         __roots__ = ['somewhere']
@@ -747,12 +748,22 @@ class ConfigIntegrationTestCase(unittest.TestCase):
         __name__ = "die"
         __init__ = "repodono.model.testing:Die"
 
+        [[resource."/"]]
+        __name__ = "three"
+        __init__ = "repodono.model.testing:Die"
+
         [endpoint._."/"]
         __provider__ = "target"
+        one = 1
+        three = 3
         """)
 
         exe = config.request_execution('/', {})
         self.assertEqual(exe.locals['target'], 'the target')
+        # environment has greatest precedence
+        self.assertEqual(exe.locals['one'], 'one')
+        # endpoint environment has second greatest
+        self.assertEqual(exe.locals['three'], 3)
 
         with self.assertRaises(Exception):
             # just to ensure that this other definition will then

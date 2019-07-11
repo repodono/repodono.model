@@ -1128,8 +1128,8 @@ class Execution(object):
         self.resources = resources
         self.endpoint_mapping = endpoint_mapping
         self.locals = EndpointExecutionLocals([
-            endpoint.environment,
             environment,
+            endpoint.environment,
             resources,
             dict(endpoint_mapping),
         ], endpoint, remap_mapping, self.default)

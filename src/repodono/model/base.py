@@ -1132,6 +1132,9 @@ class Execution(object):
         self.resources = resources
         self.endpoint_mapping = endpoint_mapping
         self.locals = EndpointExecutionLocals([
+            {
+                '__route__': endpoint.route,
+            },
             environment,
             endpoint.environment,
             resources,

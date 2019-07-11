@@ -881,3 +881,39 @@ class ConfigIntegrationTestCase(unittest.TestCase):
             'key1': 'the value',
             'key2': 'the value',
         })
+
+    def test_default_bindings(self):
+        """
+        This tests out some of the common default bindings to ensure
+        their availability from the endpoint.
+        """
+
+        config = Configuration.from_toml("""
+        [environment.variables]
+        __route__ = "this must be overridden"
+
+        [bucket._]
+        __roots__ = ['somewhere']
+
+        [[resource."/"]]
+        __name__ = "a_mock"
+        __init__ = "unittest.mock:Mock"
+
+        [endpoint._."/"]
+        __provider__ = "a_mock"
+
+        [endpoint._."/entry/"]
+        __provider__ = "a_mock"
+
+        [endpoint._."/post/"]
+        __provider__ = "a_mock"
+
+        [endpoint._."/post/{id}"]
+        __provider__ = "a_mock"
+        __route__ = "fake"
+        """)
+
+        entry = config.request_execution('/entry/', {})
+        self.assertEqual(entry.locals['__route__'], "/entry/")
+        post_id = config.request_execution('/post/{id}', {})
+        self.assertEqual(post_id.locals['__route__'], "/post/{id}")

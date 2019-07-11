@@ -210,13 +210,13 @@ class AttributeMapping(Mapping):
 
 class BasePreparedMapping(BaseMapping):
     """
-    This base class provides a prepare_from_value classmethod which
+    This base class provides a prepare_from_item classmethod which
     should be implemented.  Although in some implementations it may be
     necessary to implement as a normal method.
     """
 
     @classmethod
-    def prepare_from_value(cls, value):
+    def prepare_from_item(cls, key, value):
         """
         This must be implemented by the subclasses as it is specific to
         their implementations.  Typically a classmethod should suffice.
@@ -230,24 +230,24 @@ class BasePreparedMapping(BaseMapping):
 class PreparedMapping(BasePreparedMapping):
     """
     A mapping where assignment of some value is passed through the
-    prepare_from_value method method which must be implemented.  This is
+    prepare_from_item method method which must be implemented.  This is
     to establish a standard for restriction of types assigned.
     """
 
     def __setitem__(self, key, value):
-        super().__setitem__(key, self.prepare_from_value(value))
+        super().__setitem__(key, self.prepare_from_item(key, value))
 
 
 class DeferredPreparedMapping(BasePreparedMapping):
     """
     A mapping where retrieval of some value from some key is passed
-    through the prepare_from_value method method which must be
+    through the prepare_from_item method method which must be
     implemented.  This is so that the retrieval is calculated at
     access dynamically.
     """
 
     def __getitem__(self, key):
-        return self.prepare_from_value(super().__getitem__(key))
+        return self.prepare_from_item(key, super().__getitem__(key))
 
 
 class PathMapping(PreparedMapping):
@@ -256,7 +256,7 @@ class PathMapping(PreparedMapping):
     """
 
     @classmethod
-    def prepare_from_value(self, value):
+    def prepare_from_item(self, key, value):
         return Path(value)
 
 
@@ -274,7 +274,7 @@ class DeferredComputedMapping(DeferredPreparedMapping):
         super().__setitem__(key, value)
 
     @classmethod
-    def prepare_from_value(self, value):
+    def prepare_from_item(self, key, value):
         return value()
 
 
@@ -301,9 +301,9 @@ class SequencePreparedMapping(PreparedMapping):
         if isinstance(value, Sequence):
             result.clear()
             for item in value:
-                result.append(self.prepare_from_value(item))
+                result.append(self.prepare_from_item(key, item))
         else:
-            result.append(self.prepare_from_value(value))
+            result.append(self.prepare_from_item(key, value))
 
 
 class ReMappingProxy(Mapping):
@@ -467,7 +467,7 @@ class BaseResourceDefinitionMapping(BasePreparedMapping):
                 name, init, kwargs)
 
     @classmethod
-    def prepare_from_value(cls, value):
+    def prepare_from_item(cls, key, value):
         kwargs = dict(value)
 
         # quick check
@@ -566,7 +566,7 @@ class BaseBucketDefinitionMapping(BasePreparedMapping):
         return cls.BucketDefinition(roots, environment)
 
     @classmethod
-    def prepare_from_value(cls, value):
+    def prepare_from_item(cls, key, value):
         environment = dict(value)
         roots = environment.pop('__roots__', None)
 
@@ -652,7 +652,7 @@ class BaseReMappingDefinitionMapping(BasePreparedMapping):
         return cls.ReMappingDefinition(remap)
 
     @classmethod
-    def prepare_from_value(cls, value):
+    def prepare_from_item(cls, key, value):
         remap = dict(value)
         return cls.create_remapping_definition(remap)
 
@@ -769,7 +769,7 @@ class BaseEndpointDefinitionMapping(BasePreparedMapping):
             provider, root, kwargs_mapping, environment)
 
     @classmethod
-    def prepare_from_value(cls, value):
+    def prepare_from_item(cls, key, value):
         environment = dict(value)
         provider = environment.pop('__provider__', None)
         kwargs_mapping = environment.pop('__kwargs__', {})
@@ -806,7 +806,7 @@ class EndpointDefinitionSetMapping(PreparedMapping):
     """
 
     @classmethod
-    def prepare_from_value(self, value):
+    def prepare_from_item(self, key, value):
         return EndpointDefinitionMapping(value)
 
 
@@ -838,7 +838,7 @@ class ObjectInstantiationMapping(PreparedMapping):
         self.__vars = FlatGroupedMapping([vars_, self])
         super().__init__(items)
 
-    def prepare_from_value(self, value):
+    def prepare_from_item(self, key, value):
         # TODO if value is of a BaseResourceDefinition...
         kwargs = dict(value)
         if '__init__' not in kwargs:

@@ -108,7 +108,7 @@ class BaseMappingTestCase(unittest.TestCase):
     def test_prepared_mappings_subclassing(self):
         class BaseNoneValueMapping(BasePreparedMapping):
             @classmethod
-            def prepare_from_value(cls, value):
+            def prepare_from_item(cls, key, value):
                 if value is not None:
                     raise TypeError('None required')
 

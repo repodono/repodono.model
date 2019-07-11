@@ -1218,12 +1218,20 @@ class EndpointDefinitionMappingTestCase(unittest.TestCase):
                 '__provider__': 'some_provider',
                 'key': 'some_value',
                 'target': 'some_other_value',
-            }
+            },
+            '/some/path/{id}/details': {
+                '__provider__': 'some_provider',
+            },
         })
         definition = mapping['/some/path/{id}']
         # for the mean time, this would be unspecified.
         self.assertIsNone(definition.root)
         self.assertEqual(definition.kwargs_mapping, {})
+        self.assertEqual(definition.route, '/some/path/{id}')
+        self.assertEqual(
+            '/some/path/{id}/details',
+            mapping['/some/path/{id}/details'].route,
+        )
 
     def test_basic_creation(self):
         mapping = EndpointDefinitionMapping({
@@ -1252,6 +1260,7 @@ class EndpointDefinitionMappingTestCase(unittest.TestCase):
             'key': 'some_value',
             'target': 'some_other_value',
         })
+        self.assertEqual(definition.route, '/some/path/{id}')
 
 
 class ReMappingDefinitionMappingTestCase(unittest.TestCase):

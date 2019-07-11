@@ -677,10 +677,12 @@ class BaseEndpointDefinition(object):
     for all EndpointDefinition types.
     """
 
-    def __init__(self, provider, root, kwargs_mapping, environment):
+    def __init__(self, route, provider, root, kwargs_mapping, environment):
         """
         Arguments:
 
+        route
+            The route, typically this should be a URI Template.
         provider
             Specifies the name that will be retrieved from the execution
             locals to provide the data to be served from this end point.
@@ -707,6 +709,7 @@ class BaseEndpointDefinition(object):
             endpoint definition.
         """
 
+        self.route = route
         # the name will be referenced by the endpoint execution locals
         # resolver to allow the kwarg_mapping to be applied.
         self.name = provider
@@ -764,9 +767,9 @@ class BaseEndpointDefinitionMapping(BasePreparedMapping):
 
     @classmethod
     def create_endpoint_definition(
-            cls, provider, root, kwargs_mapping, environment):
+            cls, route, provider, root, kwargs_mapping, environment):
         return cls.EndpointDefinition(
-            provider, root, kwargs_mapping, environment)
+            route, provider, root, kwargs_mapping, environment)
 
     @classmethod
     def prepare_from_item(cls, key, value):
@@ -776,12 +779,13 @@ class BaseEndpointDefinitionMapping(BasePreparedMapping):
         # The __root__ key is not enforced by default; this is up to the
         # actual application runner to deal with and/or make use of.
         root = environment.pop('__root__', None)
+        route = key
 
         if not provider:
             raise ValueError('__provider__ must be defined')
 
         return cls.create_endpoint_definition(
-            provider, root, kwargs_mapping, environment)
+            route, provider, root, kwargs_mapping, environment)
 
 
 class EndpointDefinitionMapping(

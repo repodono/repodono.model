@@ -45,7 +45,7 @@ string that has the following three sections:
 The resulting instance will have keys of the specific required types as
 defined by the class constructor for each of the sections.
 
-.. code:: python
+.. code:: pycon
 
     >>> from repodono.model.config import Configuration
     >>> from repodono.model.environment import Environment
@@ -79,13 +79,14 @@ Currently, the supported variable definitions are:
 Restrictions that may be lifted:
 
 - Standard expansion with length modifiers, e.g. ``{var:3}``
+- Reserved expansion: while too vague and can conflict with path
+  fragment expansion.  e.g. ``/{+some_var}``, some target framework does
+  explicitly support this in some form so this has to be brought into
+  consideration.
 
 Restrictions that are unlikely to be supported in the future:
 
 - All routes must begin with '/'
-- Reserved expansion: too vague, conflicts with path fragment expansion.
-  e.g. ``/{+some_var}``, not to mention the exact behavior will become
-  undefined when integrated with certain target frameworks.
 - Standard expansion with value modifiers ``/{var*}``
 - Path-style parameters, semicolon-prefixed.  e.g. ``/{;some_var}``
 - Any additional interpretation of standard expansion
@@ -97,3 +98,10 @@ Restrictions that are unlikely to be supported in the future:
   their own implementation for dealing with query fragments sent by
   clients.  Thus everything after a query token ``?`` will be ignored.
 - Standard expansion with value modifiers ``{var*}``
+
+Defined constants from configuration bound to execution locals
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+``__route__``
+
+    The current route.

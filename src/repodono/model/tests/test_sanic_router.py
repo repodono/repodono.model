@@ -62,5 +62,11 @@ class SanicRouterTestCase(unittest.TestCase):
         ), router.get(request))
 
         request = make_request('/root/base/some/test/path/')
-        with self.assertRaises(NotFound):
-            router.get(request)
+        self.assertEqual((
+            'root-target-path',
+            [], {
+                'target': 'base',
+                'path': '/some/test/path/',
+            },
+            routeuri,
+        ), router.get(request))

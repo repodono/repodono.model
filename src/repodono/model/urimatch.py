@@ -7,7 +7,7 @@ from uritemplate.variable import URIVariable
 nr_chars = regex.escape(URIVariable.reserved)
 
 raw_single_pattern = r"(?:{joiner}(?{option}[^" + nr_chars + "]{count}))"
-raw_list_pattern = r"(?:{joiner}(?{option}[^" + nr_chars + "]+)){explode}"
+raw_list_pattern = r"(?:{joiner}(?{option}[^" + nr_chars + "]*)){explode}"
 raw_empty_pattern = ""
 
 # if placeholder wrapper be done, it could isntead be:
@@ -20,6 +20,8 @@ raw_operator_patterns = (
     ('?', raw_empty_pattern),
     ('&', raw_empty_pattern),
 )
+
+static_splitter = regex.compile('{[^}]*}').split
 
 
 def check_variable(variable):
@@ -209,37 +211,39 @@ class URITemplateMatcher(object):
             # should be resolved first.
             return (False, 0, matcher.template.uri)
 
-        target = [
+        explodes_idx = [
             idx for idx, variable in enumerate(matcher.variables)
             if variable[1].get('explode')
         ]
 
         # TODO if there are more than one of the exploding things, they
         # are simply infinite?
-        if len(target) == 0:
+        if len(explodes_idx) == 0:
             return True, len(matcher.variables), matcher.template.uri
-        elif len(target) > 1:
+        elif len(explodes_idx) > 1:
             # 4th value, true for too many (so undefined and tuck it
             # after everything
             return True, maxsize, matcher.template.uri, True
 
         # using maxsize as the basis for "maximum" number of items, even
         # though the real limit is a bit lower than that.
-        after_count = len(matcher.variables) - (target[0] + 1)
-        symbol = matcher.table[matcher.variables[target[0]][0]]
+        symbol = matcher.table[matcher.variables[explodes_idx[0]][0]]
         prefix, after = matcher.template.uri.split(symbol)
-        last_symbol = matcher.table[matcher.variables[-1][0]]
-        _, suffix = matcher.template.uri.split(last_symbol)
+        # the '/' divider do require special treatment as it is a path
+        # fragment separator.
+        suffix = tuple(
+            (frag in ('/',), frag) for frag in static_splitter(after))
 
         return (
             # first subset
             True, maxsize, prefix + symbol,
             # not multiple, TODO TBD whether this is sufficient.
             False,
-            # first one essentially deprioitise static suffix to last
-            suffix in ('', '/'), suffix,
-            not bool(after_count), after_count,
-            not bool(after), after
+            # deprioritise the entry if there is nothing, so this will
+            # match last given similarity.
+            after == '',
+            # the more variables, the lower the priority.
+            len(suffix), suffix,
         )
 
     @property

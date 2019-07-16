@@ -67,8 +67,10 @@ class WerkzeugRoutingTestCase(unittest.TestCase):
             URITemplateRule('/', endpoint='root'),
             URITemplateRule('/browse/', endpoint='entry'),
             URITemplateRule('/browse/{id}/', endpoint='entry/id'),
-            URITemplateRule('/browse/{id}{/path*}', endpoint='entry/id/path'),
+            # this has to explicitly consume the final '/' path fragment
             URITemplateRule('/browse/{id}{/path*}/', endpoint='entry/id/dir'),
+            # before the fully consumed version
+            URITemplateRule('/browse/{id}{/path*}', endpoint='entry/id/path'),
         ]).bind('example.com')
         self.assertEqual(('root', {}), m.match('/'))
         # TODO allow this type of redirects to work?
@@ -90,6 +92,21 @@ class WerkzeugRoutingTestCase(unittest.TestCase):
         self.assertEqual(('entry/id/dir', {
             'id': '1',
             'path': ['some', 'nested', 'path'],
+        }), m.match('/browse/1/some/nested/path/'))
+
+    def test_with_variables_without_trailing_slash(self):
+        m = Map([
+            URITemplateRule('/', endpoint='root'),
+            URITemplateRule('/browse/', endpoint='entry'),
+            URITemplateRule('/browse/{id}/', endpoint='entry/id'),
+            URITemplateRule('/browse/{id}{/path*}', endpoint='entry/id/path'),
+        ]).bind('example.com')
+        # unlike the previous where there is a "...{/path*}/" version
+        # defined, this will simply be fed into the other view, with
+        # path list containing a trailing empty string path fragment.
+        self.assertEqual(('entry/id/path', {
+            'id': '1',
+            'path': ['some', 'nested', 'path', ''],
         }), m.match('/browse/1/some/nested/path/'))
 
     def test_precedence(self):

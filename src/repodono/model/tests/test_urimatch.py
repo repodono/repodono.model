@@ -78,22 +78,42 @@ class TemplateRegexFactoryTestCase(unittest.TestCase):
             match.captures('path'),
         )
 
+    def test_explode_path_cases(self):
+        template = URITemplate('{/path*}')
+        rule = regex.compile(template_to_regex_patternstr(template))
+        self.assertIsNone(rule.match(''))
+        self.assertIsNone(rule.match('foo'))
+        self.assertEqual(
+            ['foo', 'bar', 'baz'],
+            rule.match('/foo/bar/baz').captures('path'),
+        )
+        self.assertEqual(
+            [''],
+            rule.match('/').captures('path'),
+        )
+
     def test_suffixed(self):
         template = URITemplate('/root/{target}{/path*}/somewhere')
         rule = regex.compile(template_to_regex_patternstr(template))
         self.assertFalse(rule.match('/root/some_target/a/nested/path'))
 
         match = rule.match('/root/some_target/a/nested/path/somewhere')
+        self.assertEqual(['some_target'], match.captures('target'))
         self.assertEqual(
             ['a', 'nested', 'path'],
             match.captures('path'),
         )
 
         match = rule.match('/root/some_target/a/path/somewhere')
+        self.assertEqual(['some_target'], match.captures('target'))
         self.assertEqual(
             ['a', 'path'],
             match.captures('path'),
         )
+
+        match = rule.match('/root/some_target//somewhere')
+        self.assertEqual(['some_target'], match.captures('target'))
+        self.assertEqual([''], match.captures('path'))
 
 
 class UriMatchTestCase(unittest.TestCase):
@@ -214,6 +234,14 @@ class URITemplateMatcherSortTestcase(unittest.TestCase):
             '/{root}{/path*}',
         ])
 
+    def test_multiple_defined_suffixes(self):
+        self.assertSorted([
+            '/{some_id}/foo/view',
+            '/{some_id}/view',
+            '/{some_id}/{foo}/view',
+            '/{some_id}/{foo}/{view}',
+        ])
+
     def test_variable_root_variables_mix3(self):
         self.assertSorted([
             '/root/{id}/view',
@@ -235,64 +263,87 @@ class URITemplateMatcherSortTestcase(unittest.TestCase):
 
     def test_multi_path_variable(self):
         self.assertSorted([
-            '/root{/somepath*}/foo/{some_id}/view',
+            '/root{/somepath*}/foo',
+            '/root{/somepath*}/foo/',
             '/root{/somepath*}/view',
+            '/root{/somepath*}/foo/{some_id}/view',
         ])
 
     def test_multi_path_variable_mix(self):
         self.assertSorted([
-            # the following pair are ambiguous if some_id is 'foo', but
-            # otherwise ordering isn't too important.
-            '/root{/somepath*}/{some_id}/foo/view',
-            '/root{/somepath*}/foo/{some_id}/view',
-            # this would get matched last as the suffix is effectively
-            # a static segment.
+            # sortest fragment is matched first
             '/root{/somepath*}/view',
+            # the following contain a pair of templates that would only
+            # trigger an ambiguous condition if some_id is 'foo', but
+            # otherwise ordering isn't too important, as the first
+            # most static prefix is "/foo/" and thus has priority.
+            '/root{/somepath*}/foo/{some_id}/view',
+            '/root{/somepath*}/{some_id}',
+            '/root{/somepath*}/{some_id}/foo/view',
         ])
 
     def test_multi_path_empty_tail_lower_priority(self):
         self.assertSorted([
             '/root/{target}{/path*}/index',
+            '/root/{target}{/path*}/view',
+            '/root/{target}{/path*}/',
+            # if this is higher, it would apply over the one with the
+            # trailing '/'
             '/root/{target}{/path*}',
+        ])
+        # however, non-expansion rules would not be relevant as the
+        # path separator will not be fed to/consumed inside {zzz}
+        self.assertSorted([
+            '/root/',
+            '/root/{zzz}/',
+            '/{zzz}',
+            '/{zzz}/',
         ])
 
     def test_path_suffix_variable_priority(self):
+        # subsequent templates without further matches (i.e. templates
+        # lacking {lang}) will always be matched first.
         self.assertSorted([
-            '/root/{id}{/path*}/aaa/{lang}/view',
             '/root/{id}{/path*}/view',
-        ])
-        self.assertSorted([
+            '/root/{id}{/path*}/view/{lang}/view',
             '/root/{id}{/path*}/zzz/{lang}/view',
-            '/root/{id}{/path*}/view',
         ])
-        # Note that this would be correct due to suffix
         self.assertSorted([
+            '/root/{id}{/path*}/view',
+            '/root/{id}{/path*}/view/{lang}/view',
+            '/root/{id}{/path*}/zzz/{lang}/view',
+        ])
+        self.assertSorted([
+            '/root/{id}{/path*}/view',
             '/root/{id}{/path*}/zzz/{lang}/view',
             '/root/{id}{/path*}/{zzz}/{lang}/view',
-            '/root/{id}{/path*}/view',
         ])
 
         # same level static only elements should be attempted before the
         # variable version.
         self.assertSorted([
             '/root/{id}{/path*}/view',
-            '/root/{id}{/path*}/{zzz}',
+            '/root/{id}{/path*}/{view}',
         ])
-
-        # Combination of assorted cases.
         self.assertSorted([
-            '/root/{id}{/path*}/aaa/{lang}/a',
-            '/root/{id}{/path*}/aaa/{zzz}/{lang}/a',
-            '/root/{id}{/path*}/{zzz}/{lang}/a',
-            '/root/{id}{/path*}/aaa',
-            '/root/{id}{/path*}/aaa/{lang}/view',
-            '/root/{id}{/path*}/zzz/{lang}/view',
-            '/root/{id}{/path*}/{zzz}/{lang}/view',
             '/root/{id}{/path*}/view',
-            '/root/{id}{/path*}/zzz',
-            '/root/{id}{/path*}/{zzz}',
-            '/root/{id}{/path*}/{zzz}/{lang}',
-            '/root/{id}{/path*}/{zzz}/{lang}/{a}',
+            '/root/{id}{/path*}/{view}/view',
+        ])
+        # ditto for a mixture like so - the static view prefix after the
+        # path will always match first, then follow by the wildcard
+        # version with an explicit static suffix, finally the full wild.
+        self.assertSorted([
+            '/root/{id}{/path*}/view',
+            '/root/{id}{/path*}/view/{captures}',
+            '/root/{id}{/path*}/{view}/captures',
+            '/root/{id}{/path*}/{view}/{captures}',
+        ])
+        # should behave the same without the wildcards.
+        self.assertSorted([
+            '/view',
+            '/view/{captures}',
+            '/{view}/captures',
+            '/{view}/{captures}',
         ])
 
         self.assertSorted([
@@ -320,23 +371,22 @@ class URITemplateMatcherSortTestcase(unittest.TestCase):
 
         # Further cases.
         self.assertSorted([
-            '/root/{id}{/path*}/root/{zzz}/suffix',
-            '/root/{id}{/path*}/{zzz}/suffix',
-            '/root/{id}{/path*}/root/{zzz}/{lang}/suffix',
-            '/root/{id}{/path*}/{zzz}/{lang}/suffix',
-            '/root/{id}{/path*}/root/{zzz}/{lang}/{a}/suffix',
-            '/root/{id}{/path*}/{zzz}/{lang}/{a}/suffix',
             '/root/{id}{/path*}/root/{zzz}',
-            '/root/{id}{/path*}/{zzz}',
-            '/root/{id}{/path*}/root/{zzz}/{lang}',
-            '/root/{id}{/path*}/{zzz}/{lang}',
-            '/root/{id}{/path*}/root/{zzz}/{lang}/{a}',
-            '/root/{id}{/path*}/{zzz}/{lang}/{a}',
-            '/root/{id}{/path*}/root/{zzz}/',
+            '/root/{id}{/path*}/root/{zzz}/suffix',
+            '/root/{id}{/path*}/root/suffix/{wat}',
+            '/root/{id}{/path*}/{zzz}/suffix',
             '/root/{id}{/path*}/{zzz}/',
+            '/root/{id}{/path*}/root/{zzz}/{lang}',
+            '/root/{id}{/path*}/root/{zzz}/{lang}/suffix',
             '/root/{id}{/path*}/root/{zzz}/{lang}/',
+            '/root/{id}{/path*}/{zzz}/{lang}',
+            '/root/{id}{/path*}/{zzz}/{lang}/suffix',
             '/root/{id}{/path*}/{zzz}/{lang}/',
+            '/root/{id}{/path*}/root/{zzz}/{lang}/{a}',
+            '/root/{id}{/path*}/root/{zzz}/{lang}/{a}/suffix',
             '/root/{id}{/path*}/root/{zzz}/{lang}/{a}/',
+            '/root/{id}{/path*}/{zzz}/{lang}/{a}',
+            '/root/{id}{/path*}/{zzz}/{lang}/{a}/suffix',
             '/root/{id}{/path*}/{zzz}/{lang}/{a}/',
         ])
 

@@ -95,13 +95,54 @@ def build_pattern_map(
     }
 
 
+def check_template_leading_slash(template):
+    if not ((template.uri[:1] == '/') or (
+            (template.uri[:1] == '{') and
+            template.variables and
+            template.variables[0].operator == '/')):
+        raise ValueError(
+            "unsupported uritemplate: missing a leading '/' or "
+            "'{/path}' variable"
+        )
+
+
+def check_template_no_naked_query(template):
+    if '?' in template.expand():
+        raise ValueError(
+            "unsupported uritemplate: query expansion '?' must be defined "
+            "using a query expansion (e.g. '{?query}')"
+        )
+
+
+def check_template_no_name_reuse(template):
+    if len(template.variables) > len(template.variable_names):
+        raise ValueError(
+            "unsupported uritemplate: variable names have been reused"
+            # TODO list out variables that were reused
+        )
+
+
+default_template_validators = [
+    check_template_leading_slash,
+    check_template_no_naked_query,
+    check_template_no_name_reuse,
+    # There will be no checking of the following, as templates will be
+    # checked by _validate_variable for each variable name in the converter
+    # factory
+    # if len(template.variables) < len(template.variable_names):
+]
+
+
 class TemplateConverterFactory(object):
 
-    def __init__(self, operator_patterns, pattern_finalizer):
+    def __init__(
+            self, operator_patterns, pattern_finalizer,
+            template_validators=default_template_validators):
         self.pattern_map = build_pattern_map(
             operator_patterns=operator_patterns,
             pattern_finalizer=pattern_finalizer,
         )
+        self.template_validators = template_validators
 
     def _validate_variable(self, variable):
         if variable.operator not in self.pattern_map:
@@ -117,27 +158,8 @@ class TemplateConverterFactory(object):
             yield (name, '{%s}' % variable.original, pat)
 
     def _validate_uri(self, template):
-        if not ((template.uri[:1] == '/') or (
-                (template.uri[:1] == '{') and
-                template.variables and
-                template.variables[0].operator == '/')):
-            raise ValueError(
-                "unsupported uritemplate: missing a leading '/' or "
-                "'{/path}' variable"
-            )
-        if '?' in template.expand():
-            raise ValueError(
-                "unsupported uritemplate: query expansion '?' must be defined "
-                "using a query expansion (e.g. '{?query}')"
-            )
-        if len(template.variables) > len(template.variable_names):
-            raise ValueError(
-                "unsupported uritemplate: variable names have been reused"
-                # TODO list out variables that were reused
-            )
-        # the following will not be checked as it will be checked by
-        # _validate_variable for each variable name
-        # if len(template.variables) < len(template.variable_names):
+        for validator in self.template_validators:
+            validator(template)
 
     def supported(self, template):
         try:
@@ -253,20 +275,25 @@ class URITemplateMatcher(object):
     def build_sort_key(self):
         self._sort_key = self.compute_sort_key(self)
 
-    def __init__(self, template):
+    def __init__(
+            self, template, template_converter=template_to_regex_patternstr):
         """
         Arguments:
 
-        uritemplate
+        template
             The URITemplate object to build a matcher from.
+        template_converter
+            A instance of template converter produced by the
+            TemplateConverterFactory which will provide the methods
+            required for the conversion.
         """
 
         self.template = template
-        chunks = list(template_to_regex_patternstr.iter_template(template))
+        chunks = list(template_converter.iter_template(template))
         self.table = {
             name: orig for type_, name, orig, fragment in chunks if name}
         self.regex_pattern = regex.compile(
-            template_to_regex_patternstr.pattern_from_fragments(chunks))
+            template_converter.pattern_from_fragments(chunks))
         # could use itertools.chain?
         self.variables = []
         for variable in self.template.variables:

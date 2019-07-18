@@ -6,6 +6,15 @@ from repodono.model.routing import URITemplateRouter
 
 class URITemplateRouterTestCase(unittest.TestCase):
 
+    def test_unacceptable_route(self):
+        # TODO decide whether failing all routes because one route has
+        # failed is intended.
+        with self.assertRaises(ValueError):
+            URITemplateRouter([
+                URITemplate('{target}'),
+                URITemplate('/{target}'),
+            ])
+
     def assertRouting(self, uri, uritemplate, variables):
         self.assertEqual((uritemplate, variables), self.router(uri))
 

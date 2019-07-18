@@ -123,7 +123,6 @@ def check_template_no_name_reuse(template):
 
 
 default_template_validators = [
-    check_template_leading_slash,
     check_template_no_naked_query,
     check_template_no_name_reuse,
     # There will be no checking of the following, as templates will be

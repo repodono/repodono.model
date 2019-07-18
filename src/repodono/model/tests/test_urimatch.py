@@ -5,6 +5,7 @@ from uritemplate import URITemplate
 
 from repodono.model.urimatch import template_to_regex_patternstr
 from repodono.model.urimatch import check_variable
+from repodono.model.urimatch import check_template_leading_slash
 from repodono.model.urimatch import match
 from repodono.model.urimatch import URITemplateMatcher
 
@@ -52,13 +53,20 @@ class ValidityTestCase(unittest.TestCase):
         self.assertSupported('/target{?foo}')
 
     def test_invalid_templates(self):
-        self.assertUnsupported('{count}')  # missing leading /
-        self.assertUnsupported('{}')
         self.assertUnsupported('/target?foo={count}')
         self.assertUnsupported('/{x,y}')
         self.assertUnsupported('/{+values}')
         self.assertUnsupported('{/values}/{values}')
         self.assertUnsupported('/{x,y}/{y}')
+
+    def test_no_slash_leading_fail(self):
+        with self.assertRaises(ValueError):
+            check_template_leading_slash(URITemplate('{}'))
+
+        with self.assertRaises(ValueError):
+            check_template_leading_slash(URITemplate('{count}'))
+
+        check_template_leading_slash(URITemplate('/{count}'))
 
 
 class TemplateRegexFactoryTestCase(unittest.TestCase):

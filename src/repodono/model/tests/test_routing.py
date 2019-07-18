@@ -15,8 +15,26 @@ class URITemplateRouterTestCase(unittest.TestCase):
                 URITemplate('/{target}'),
             ])
 
-    def assertRouting(self, uri, uritemplate, variables):
-        self.assertEqual((uritemplate, variables), self.router(uri))
+    def assertRouting(self, uri, template_str, variables):
+        self.assertEqual((template_str, variables), self.router(uri))
+        # test that the round-trip back to the uri actuallyworks.
+        self.assertEqual(URITemplate(template_str).expand(**variables), uri)
+
+    def test_assertion_sane(self):
+        # just lazily inline this test here.
+        def fake_router(uri):
+            return ('good', {},)
+
+        self.router = fake_router
+        self.assertRouting('good', 'good', {})
+
+        with self.assertRaises(AssertionError):
+            # fail the first equality
+            self.assertRouting('bad', 'bad', {})
+
+        with self.assertRaises(AssertionError):
+            # fail the second equality
+            self.assertRouting('', 'good', {})
 
     def test_standard_construction(self):
         self.router = URITemplateRouter([

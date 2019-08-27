@@ -917,3 +917,42 @@ class ConfigIntegrationTestCase(unittest.TestCase):
         self.assertEqual(entry.locals['__route__'], "/entry/")
         post_id = config.request_execution('/post/{id}', {})
         self.assertEqual(post_id.locals['__route__'], "/post/{id}")
+
+    def test_route_binding_scope(self):
+        """
+        Test where/how the __route__ is actually accessed/used/bounded
+        depending on where/how it is specified.
+        """
+
+        config = Configuration.from_toml("""
+        [bucket._]
+        __roots__ = ['base_root']
+
+        [[resource."/static"]]
+        __name__ = "static"
+        __init__ = "unittest.mock:Mock"
+        route = "__route__"
+
+        [[resource."/dynamic"]]
+        __name__ = "dynamic"
+        __init__ = "unittest.mock:Mock"
+        route = "route"
+
+        [endpoint._."/static/subpath"]
+        __provider__ = "static"
+
+        [localmap."/dynamic/{value}"]
+        route = "__route__"
+        [endpoint._."/dynamic/{value}"]
+        __provider__ = "dynamic"
+        """)
+
+        static = config.request_execution('/static/subpath', {})
+        static_mock = static.locals['static']
+        dynamic = config.request_execution('/dynamic/{value}', {
+            'value': 'subpath',
+        })
+        dynamic_mock = dynamic.locals['dynamic']
+
+        self.assertEqual(dynamic_mock.route, "/dynamic/{value}")
+        self.assertEqual(static_mock.route, "/static")

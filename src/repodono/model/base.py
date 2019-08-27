@@ -378,10 +378,24 @@ class BaseResourceDefinition(object):
     for all ResourceDefinition types.
     """
 
-    def __init__(self, name, call, kwargs):
+    def __init__(self, name, call, kwargs, consts=None):
+        """
+        name
+            The name that the resulting resource should be bound to
+        call
+            The callable target; either an attrgetter or a callable
+        kwargs
+            The indirect mapping from keyword to some other binding that
+            will be resolved right before final instantiation of the
+            reference at call
+        consts
+            A mapping of constants that will override the mapping
+        """
+
         self.name = name
         self.call = call
         self.kwargs = kwargs
+        self.consts = {} if consts is None else consts
 
     def __iter__(self):
         yield self.name
@@ -414,7 +428,8 @@ class BaseResourceDefinition(object):
         omit = set(omit_keys)
 
         final_kwargs = map_vars_value({
-            k: v for k, v in self.kwargs.items() if k not in omit}, vars_)
+            k: v for k, v in self.kwargs.items() if k not in omit
+        }, FlatGroupedMapping([self.consts, vars_]))
         final_kwargs.update(kwargs)
         # XXX this does NOT actually trigger the assignment to
         # vars_[self.name], as the current definition on how the
@@ -442,29 +457,30 @@ class BaseResourceDefinitionMapping(BasePreparedMapping):
     class ResourceDefinition(BaseResourceDefinition):
 
         @classmethod
-        def from_call(cls, name, call, kwargs):
+        def from_call(cls, name, call, kwargs, consts=None):
             # XXX call must be an indirect call that will load the
             # actual thing from vars then return call(**kwargs)
             # FIXME this is currently a placeholder
-            return cls(name=name, call=attrgetter(call), kwargs=kwargs)
+            return cls(
+                name=name, call=attrgetter(call), kwargs=kwargs, consts=consts)
 
         @classmethod
-        def from_entry_point(cls, name, init, kwargs):
+        def from_entry_point(cls, name, init, kwargs, consts=None):
             entry = EntryPoint.parse('target=' + init)
             call = entry.resolve()
-            return cls(name=name, call=call, kwargs=kwargs)
+            return cls(name=name, call=call, kwargs=kwargs, consts=consts)
 
         # TODO vars_ as an argument determine if sane?
 
     @classmethod
-    def create_resource_definition(cls, name, call, init, kwargs):
+    def create_resource_definition(cls, name, call, init, kwargs, consts=None):
         # a naive, generic creation method.
         if call is not None:
             return cls.ResourceDefinition.from_call(
-                name, call, kwargs)
+                name, call, kwargs, consts=consts)
         elif init is not None:
             return cls.ResourceDefinition.from_entry_point(
-                name, init, kwargs)
+                name, init, kwargs, consts=consts)
 
     @classmethod
     def prepare_from_item(cls, key, value):
@@ -481,7 +497,10 @@ class BaseResourceDefinitionMapping(BasePreparedMapping):
         # either of the callables.
         call = kwargs.pop('__call__', None)
         init = kwargs.pop('__init__', None)
-        return cls.create_resource_definition(name, call, init, kwargs)
+        consts = {
+            '__route__': key,
+        }
+        return cls.create_resource_definition(name, call, init, kwargs, consts)
 
     # one possible way for subclass to do a lazy load of the definition
     # during access is to override __getitem__ and apply self to kwargs

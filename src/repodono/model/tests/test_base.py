@@ -954,6 +954,22 @@ class BaseResourceDefinitionTestCase(unittest.TestCase):
         self.assertTrue(callable(result))
         self.assertEqual(result().path, 'dot_value')
 
+    def test_consts(self):
+        # normally, the consts mapping is not provided by the user,
+        # but reserved for usage by the system.
+        static = BaseResourceDefinition(name='static', call=Thing, kwargs={
+            'path': '__path__'
+        }, consts={
+            '__path__': 'static'
+        })
+        mapping = dict([static])
+        # automatically be usable as part of a cast as part of an item
+        # in a list to a mapping under the key provided by name.
+        self.assertIs(mapping['static'], static)
+        self.assertEqual(mapping['static'](vars_={
+            '__path__': 'modified',
+        })().path, 'static')
+
 
 class ResourceDefinitionMappingTestCase(unittest.TestCase):
 

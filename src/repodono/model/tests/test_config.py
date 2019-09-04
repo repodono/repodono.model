@@ -681,6 +681,29 @@ class ConfigIntegrationTestCase(unittest.TestCase):
         # the one provided by kwargs will take precedence.
         self.assertEqual(both_exe().path, 'the value')
 
+    def test_resource_kwarg_dict(self):
+        # Test that dictionary values passed to resource also resolved.
+        config = Configuration.from_toml("""
+        [environment.variables]
+        some_name = "the value"
+
+        [bucket._]
+        __roots__ = ['somewhere']
+
+        [[resource."/"]]
+        __name__ = "thing"
+        __init__ = "repodono.model.testing:Thing"
+        path.key = "some_name"
+
+        [endpoint._."/entry/view"]
+        __provider__ = "thing"
+        """)
+
+        exe = config.request_execution('/entry/view', {})
+        self.assertEqual(exe.locals['thing'].path, {'key': 'the value'})
+        # this would have simply access the value like above also
+        self.assertEqual(exe().path, {'key': 'the value'})
+
     def test_localmap(self):
         # Test out the resource definition that specified a required
         # keyword argument with a reference, but then that reference is

@@ -704,6 +704,34 @@ class ConfigIntegrationTestCase(unittest.TestCase):
         # this would have simply access the value like above also
         self.assertEqual(exe().path, {'key': 'the value'})
 
+    def test_resource_dot_access_argument(self):
+        # Test that dictionary values passed to resource also resolved.
+        config = Configuration.from_toml("""
+        [environment.variables]
+        some_value = "the value"
+
+        [[environment.objects]]
+        __name__ = "dot"
+        __init__ = "repodono.model.testing:AttrBaseMapping"
+        value = "some_value"
+
+        [bucket._]
+        __roots__ = ['somewhere']
+
+        [[resource."/"]]
+        __name__ = "thing"
+        __init__ = "repodono.model.testing:Thing"
+        path = "dot.value"
+
+        [endpoint._."/entry/view"]
+        __provider__ = "thing"
+        """)
+
+        exe = config.request_execution('/entry/view', {})
+        self.assertEqual(exe.locals['thing'].path, "the value")
+        # this would have simply access the value like above also
+        self.assertEqual(exe().path, "the value")
+
     def test_localmap(self):
         # Test out the resource definition that specified a required
         # keyword argument with a reference, but then that reference is

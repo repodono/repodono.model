@@ -5,7 +5,6 @@ from functools import partial
 from ast import literal_eval
 
 from repodono.model.base import (
-    AttributeMapping,
     BaseMapping,
     BasePreparedMapping,
     BaseResourceDefinition,
@@ -30,10 +29,7 @@ from repodono.model.base import (
     StructuredMapping,
 )
 from repodono.model.testing import Thing
-
-
-class AttrBaseMapping(BaseMapping, AttributeMapping):
-    "Only for this local base test class."
+from repodono.model.testing import AttrBaseMapping
 
 
 class BaseMappingTestCase(unittest.TestCase):

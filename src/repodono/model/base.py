@@ -23,6 +23,10 @@ def map_vars_value(value, vars_):
     elif isinstance(value, dict):
         return {
             name: map_vars_value(key, vars_) for name, key in value.items()}
+    elif isinstance(value, attrgetter):
+        return value(vars_)
+    elif '.' in value:
+        return attrgetter(value)(vars_)
     else:
         return vars_[value]
 
@@ -206,6 +210,13 @@ class AttributeMapping(Mapping):
                 return result
         raise AttributeError("'%s' object has no attribute '%s'" % (
             type(self).__name__, attr))
+
+
+class AttributeFlatGroupedMapping(FlatGroupedMapping, AttributeMapping):
+    """
+    A mapping that combines the features of FlatGroupedMapping with
+    AttributeMapping.
+    """
 
 
 class BasePreparedMapping(BaseMapping):
@@ -418,9 +429,7 @@ class BaseResourceDefinition(object):
             returned partial.
         """
 
-        if isinstance(self.call, attrgetter):
-            call = self.call(vars_)
-        elif callable(self.call):
+        if callable(self.call) and not isinstance(self.call, attrgetter):
             call = self.call
         else:
             call = map_vars_value(self.call, vars_)
@@ -429,7 +438,7 @@ class BaseResourceDefinition(object):
 
         final_kwargs = map_vars_value({
             k: v for k, v in self.kwargs.items() if k not in omit
-        }, FlatGroupedMapping([self.consts, vars_]))
+        }, AttributeFlatGroupedMapping([self.consts, vars_]))
         final_kwargs.update(kwargs)
         # XXX this does NOT actually trigger the assignment to
         # vars_[self.name], as the current definition on how the
@@ -1071,7 +1080,7 @@ class CompiledRouteResourceDefinitionMapping(BaseMapping):
         super().__setitem__(*self.build_item(key, value))
 
 
-class ExecutionLocals(FlatGroupedMapping, AttributeMapping):
+class ExecutionLocals(AttributeFlatGroupedMapping):
     """
     This should be constructed from a FlatGroupedMapping that has
     grouped all the relevant resource definitions mapping defined for

@@ -89,8 +89,22 @@ class URITemplateRouterTestCase(unittest.TestCase):
             self.router('/e/+wat'))
         self.assertIsNone(
             self.router('/z/nowhere/short/path/alternate/some_view'))
-        self.assertIsNone(
-            self.router('/w/not_enough'))
+
+        self.assertRouting(
+            '/w/not_enough',
+            '/w/{target}{/path*}', {
+                'target': 'not_enough',
+                'path': [],
+            }
+        )
+
+        self.assertRouting(
+            '/w/other_target/view',
+            '/w/{target}{/path*}/view', {
+                'target': 'other_target',
+                'path': [],
+            }
+        )
 
     def test_from_list_of_strings(self):
         self.router = URITemplateRouter.from_strings([

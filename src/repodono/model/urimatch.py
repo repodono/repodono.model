@@ -57,7 +57,9 @@ def default_pattern_finalizer(pattern_str, variable):
         # be supported it should be replaced with a specific max count?
         # perhaps {1,count}
         count='+',
-        explode='+' if variable.variables[0][1]['explode'] else '',
+        # if explode is '+', it will force some fragment to be matched,
+        # which will mean an empty list of explodes be not matched.
+        explode='*' if variable.variables[0][1]['explode'] else '',
     )
 
 

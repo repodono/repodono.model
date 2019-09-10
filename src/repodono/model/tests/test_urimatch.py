@@ -89,7 +89,7 @@ class TemplateRegexFactoryTestCase(unittest.TestCase):
     def test_explode_path_cases(self):
         template = URITemplate('{/path*}')
         rule = regex.compile(template_to_regex_patternstr(template))
-        self.assertIsNone(rule.match(''))
+        self.assertEqual([], rule.match('').captures('path'))
         self.assertIsNone(rule.match('foo'))
         self.assertEqual(
             ['foo', 'bar', 'baz'],

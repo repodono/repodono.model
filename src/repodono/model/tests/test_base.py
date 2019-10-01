@@ -1119,7 +1119,7 @@ class ResourceDefinitionMappingTestCase(unittest.TestCase):
 class BaseBucketDefinitionTestCase(unittest.TestCase):
 
     def test_base_match(self):
-        bucket = BaseBucketDefinition([], {'accept': ['text/html']})
+        bucket = BaseBucketDefinition('base', [], {'accept': ['text/html']})
         self.assertEqual(0, bucket.match({'accept': 'text/plain'}))
         self.assertEqual(1, bucket.match({'accept': 'text/html'}))
         self.assertEqual(1, bucket.match({
@@ -1128,7 +1128,7 @@ class BaseBucketDefinitionTestCase(unittest.TestCase):
         }))
 
     def test_multi_match(self):
-        bucket = BaseBucketDefinition([], {
+        bucket = BaseBucketDefinition('base', [], {
             'accept': ['text/xml', 'application/xml'],
             'accept-language': ['en-NZ', 'en-US'],
         })
@@ -1222,7 +1222,7 @@ class EndpointDefinitionMappingTestCase(unittest.TestCase):
                     'key': 'some_value',
                     'target': 'some_other_value',
                 }
-            })
+            }, bucket_name='bucket_name')
 
     def test_missing_optional(self):
         mapping = EndpointDefinitionMapping({
@@ -1234,7 +1234,7 @@ class EndpointDefinitionMappingTestCase(unittest.TestCase):
             '/some/path/{id}/details': {
                 '__provider__': 'some_provider',
             },
-        })
+        }, bucket_name='bucket_name')
         definition = mapping['/some/path/{id}']
         # for the mean time, this would be unspecified.
         self.assertIsNone(definition.root)
@@ -1256,7 +1256,7 @@ class EndpointDefinitionMappingTestCase(unittest.TestCase):
                 'key': 'some_value',
                 'target': 'some_other_value',
             }
-        })
+        }, bucket_name='bucket_name')
         definition = mapping['/some/path/{id}']
         # provide access to the raw keys
         provider = object()

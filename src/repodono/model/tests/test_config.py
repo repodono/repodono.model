@@ -147,6 +147,12 @@ class ConfigBucketTestCase(unittest.TestCase):
     def test_basic_roots(self):
         # note that the current setup captures everything.
         config = Configuration.from_toml("""
+        [environment.paths]
+        default_root = "/default"
+        generated_root = "/generated"
+        xml_root = "/xml"
+        json_root = "/json"
+
         [bucket._]
         __roots__ = ["default_root", "generated_root"]
         accept = ["*/*"]
@@ -161,13 +167,18 @@ class ConfigBucketTestCase(unittest.TestCase):
         """)
 
         self.assertEqual([
-            'default_root', 'generated_root'], config.bucket['_'].roots)
+            '/default', '/generated'
+        ], [
+            str(r) for r in config.bucket['_'].roots
+        ])
         self.assertEqual({'accept': ['*/*']}, config.bucket['_'].environment)
-        self.assertEqual(['json_root'], config.bucket['json'].roots)
+        self.assertEqual([
+            '/json'], [str(r) for r in config.bucket['json'].roots])
         self.assertEqual({
             'accept': ['application/json', 'text/json']
         }, config.bucket['json'].environment)
-        self.assertEqual(['xml_root'], config.bucket['xml'].roots)
+        self.assertEqual([
+            '/xml'], [str(r) for r in config.bucket['xml'].roots])
         self.assertEqual({
             'accept': ['application/xml', 'text/xml']
         }, config.bucket['xml'].environment)
@@ -250,7 +261,7 @@ class ConfigIntegrationTestCase(unittest.TestCase):
 
     def test_environment_shadowing(self):
         config_str = """
-        [environment.variables]
+        [environment.paths]
         foo = 'bar'
 
         [[environment.objects]]
@@ -266,12 +277,14 @@ class ConfigIntegrationTestCase(unittest.TestCase):
         """
 
         config = Configuration.from_toml(config_str)
-        self.assertEqual(config['environment']['variables']['foo'], 'bar')
+        self.assertEqual(str(config['environment']['paths']['foo']), 'bar')
         # entry is defined.
         self.assertEqual(
             config['environment']['objects'][0]['__name__'], 'foo')
         exe = config.request_execution('/', {})
-        self.assertEqual(exe.locals['foo'], 'bar')
+        self.assertEqual(str(exe.locals['foo']), 'bar')
+        # auxilary check
+        self.assertEqual(str(exe.locals['__root__']), 'bar')
 
     def test_compiled_details(self):
         root = TemporaryDirectory()
@@ -279,6 +292,13 @@ class ConfigIntegrationTestCase(unittest.TestCase):
         config = Configuration.from_toml("""
         [environment.variables]
         foo = "bar"
+
+        [environment.paths]
+        base_root = %(root)r
+        default_root = %(root)r
+        generated_root = %(root)r
+        json_root = %(root)r
+        xml_root = %(root)r
 
         [bucket._]
         __roots__ = ["default_root", "generated_root"]
@@ -291,9 +311,6 @@ class ConfigIntegrationTestCase(unittest.TestCase):
         [bucket.xml]
         __roots__ = ["xml_root"]
         accept = ["application/xml", "text/xml"]
-
-        [environment.paths]
-        base_root = %r
 
         [[environment.objects]]
         __name__ = "thing"
@@ -348,7 +365,7 @@ class ConfigIntegrationTestCase(unittest.TestCase):
         __provider__ = "blog_entry_details"
         details = true
         format = "verbose"
-        """ % (root.name,))
+        """ % {'root': root.name})
 
         top = config.request_execution(
             '/entry/{entry_id}', {'entry_id': '123'})
@@ -426,6 +443,11 @@ class ConfigIntegrationTestCase(unittest.TestCase):
         [environment.variables]
         foo = "bar"
 
+        [environment.paths]
+        base_root = %(root)r
+        json_root = %(root)r
+        xml_root = %(root)r
+
         [bucket.json]
         __roots__ = ["json_root"]
         accept = ["application/json", "text/json"]
@@ -433,9 +455,6 @@ class ConfigIntegrationTestCase(unittest.TestCase):
         [bucket.xml]
         __roots__ = ["xml_root"]
         accept = ["application/xml", "text/xml"]
-
-        [environment.paths]
-        base_root = %r
 
         [endpoint.json."/entry/{entry_id}/details"]
         __provider__ = "blog_entry_details"
@@ -450,7 +469,7 @@ class ConfigIntegrationTestCase(unittest.TestCase):
         [endpoint.xml."/entry/{entry_id}/debug"]
         __provider__ = "blog_entry_details"
         debug = true
-        """ % (root.name,))
+        """ % {'root': root.name})
 
         details = config.request_execution(
             '/entry/{entry_id}/details', {'entry_id': '123'}, {
@@ -476,6 +495,9 @@ class ConfigIntegrationTestCase(unittest.TestCase):
         config = Configuration.from_toml("""
         [environment.variables]
         thing = "env"
+
+        [environment.paths]
+        somewhere = "/"
 
         [bucket._]
         __roots__ = ['somewhere']
@@ -508,6 +530,9 @@ class ConfigIntegrationTestCase(unittest.TestCase):
         [environment.variables]
         thing = "env"
 
+        [environment.paths]
+        somewhere = "/"
+
         [bucket._]
         __roots__ = ['somewhere']
         accept = ["*/*"]
@@ -539,6 +564,9 @@ class ConfigIntegrationTestCase(unittest.TestCase):
         [environment.variables]
         thing = "thing"
 
+        [environment.paths]
+        somewhere = "/"
+
         [bucket._]
         __roots__ = ['somewhere']
         accept = ["*/*"]
@@ -564,6 +592,9 @@ class ConfigIntegrationTestCase(unittest.TestCase):
 
     def test_endpoint_kwargs_missing(self):
         config = Configuration.from_toml("""
+        [environment.paths]
+        somewhere = "/"
+
         [bucket._]
         __roots__ = ['somewhere']
         accept = ["*/*"]
@@ -593,6 +624,9 @@ class ConfigIntegrationTestCase(unittest.TestCase):
         config = Configuration.from_toml("""
         [environment.variables]
         some_name = "the value"
+
+        [environment.paths]
+        somewhere = "/"
 
         [bucket._]
         __roots__ = ['somewhere']
@@ -634,6 +668,9 @@ class ConfigIntegrationTestCase(unittest.TestCase):
         config = Configuration.from_toml("""
         [environment.variables]
         some_name = "the value"
+
+        [environment.paths]
+        somewhere = "/"
 
         [bucket._]
         __roots__ = ['somewhere']
@@ -687,6 +724,9 @@ class ConfigIntegrationTestCase(unittest.TestCase):
         [environment.variables]
         some_name = "the value"
 
+        [environment.paths]
+        somewhere = "/"
+
         [bucket._]
         __roots__ = ['somewhere']
 
@@ -709,6 +749,9 @@ class ConfigIntegrationTestCase(unittest.TestCase):
         config = Configuration.from_toml("""
         [environment.variables]
         some_value = "the value"
+
+        [environment.paths]
+        somewhere = "/"
 
         [[environment.objects]]
         __name__ = "dot"
@@ -740,6 +783,9 @@ class ConfigIntegrationTestCase(unittest.TestCase):
         config = Configuration.from_toml("""
         [environment.variables]
         some_name = "the value"
+
+        [environment.paths]
+        somewhere = "/"
 
         [bucket._]
         __roots__ = ['somewhere']
@@ -787,6 +833,9 @@ class ConfigIntegrationTestCase(unittest.TestCase):
         target = "the target"
         one = "one"
 
+        [environment.paths]
+        somewhere = "/"
+
         [bucket._]
         __roots__ = ['somewhere']
 
@@ -827,6 +876,9 @@ class ConfigIntegrationTestCase(unittest.TestCase):
         one = "one"
         two = "two"
 
+        [environment.paths]
+        somewhere = "/"
+
         [bucket._]
         __roots__ = ['somewhere']
 
@@ -853,6 +905,9 @@ class ConfigIntegrationTestCase(unittest.TestCase):
         [environment.variables]
         one = "one"
         two = "two"
+
+        [environment.paths]
+        somewhere = "/"
 
         [default.variables]
         two = 2
@@ -903,6 +958,9 @@ class ConfigIntegrationTestCase(unittest.TestCase):
         [environment.variables]
         some_name = "the value"
 
+        [environment.paths]
+        somewhere = "/"
+
         [default.variables]
         some_map = {}
 
@@ -943,6 +1001,9 @@ class ConfigIntegrationTestCase(unittest.TestCase):
         [environment.variables]
         __route__ = "this must be overridden"
 
+        [environment.paths]
+        somewhere = "/"
+
         [bucket._]
         __roots__ = ['somewhere']
 
@@ -976,6 +1037,9 @@ class ConfigIntegrationTestCase(unittest.TestCase):
         """
 
         config = Configuration.from_toml("""
+        [environment.paths]
+        base_root = "/"
+
         [bucket._]
         __roots__ = ['base_root']
 
@@ -1007,3 +1071,114 @@ class ConfigIntegrationTestCase(unittest.TestCase):
 
         self.assertEqual(dynamic_mock.route, "/dynamic/{value}")
         self.assertEqual(static_mock.route, "/static")
+
+    # __root__ and path and other filesystem interaction tests
+
+    def test_config_root_usage(self):
+        with self.assertRaises(TypeError) as e:
+            Configuration.from_toml("""
+            [environment.variable]
+            root = "foo"
+
+            [bucket._]
+            __roots__ = ['root']
+            """)
+
+        self.assertEqual(
+            e.exception.args[0],
+            "'root' must be declared under environment.paths, "
+            "referenced by bucket '_'",
+            # TODO should list which bucket, i.e. in [bucket._],...
+        )
+
+    def test_config_bucket_roots_usage(self):
+        with self.assertRaises(TypeError) as e:
+            Configuration.from_toml("""
+            [environment.variable]
+            root = "foo"
+
+            [bucket._]
+            __roots__ = ['root']
+            """)
+
+        self.assertEqual(
+            e.exception.args[0],
+            "'root' must be declared under environment.paths, "
+            "referenced by bucket '_'",
+        )
+
+    def test_config_endpoint_root_usage(self):
+        with self.assertRaises(TypeError) as e:
+            Configuration.from_toml("""
+            [environment.variable]
+            root = "foo"
+
+            [endpoint._."/"]
+            __provider__ = 'root'
+            __root__ = 'root'
+            """)
+
+        self.assertEqual(
+            e.exception.args[0],
+            "'root' must be declared under environment.paths, "
+            "referenced by endpoint definition '_.\"/\"'"
+        )
+
+    def test_root_resolution(self):
+        """
+        Test where/how the __route__ is actually accessed/used/bounded
+        depending on where/how it is specified.
+        """
+
+        std_root = TemporaryDirectory()
+        self.addCleanup(std_root.cleanup)
+        alt_root = TemporaryDirectory()
+        self.addCleanup(alt_root.cleanup)
+
+        config = Configuration.from_toml("""
+        [environment.paths]
+        std_root = %r
+        alt_root = %r
+
+        [bucket._]
+        __roots__ = ['std_root']
+
+        [bucket."alt"]
+        __roots__ = ['alt_root', 'std_root']
+        accept = ['application/x-alt']
+
+        [[resource."/"]]
+        __name__ = "mock"
+        __init__ = "unittest.mock:Mock"
+
+        [endpoint._."/entry/"]
+        __provider__ = "mock"
+
+        [endpoint."alt"."/entry/"]
+        __provider__ = "mock"
+
+        [endpoint."alt"."/post/"]
+        __provider__ = "mock"
+        __root__ = "std_root"
+        """ % (std_root.name, alt_root.name))
+
+        std_entry = config.request_execution(
+            '/entry/', {}, {'accept': 'text/plain'})
+        self.assertEqual(
+            str(std_entry.locals['__root__']), std_root.name,
+            'not equal to std_root.name',
+        )
+
+        alt_entry = config.request_execution(
+            '/entry/', {}, {'accept': 'application/x-alt'})
+        self.assertEqual(
+            str(alt_entry.locals['__root__']), alt_root.name,
+            'not equal to alt_root.name',
+        )
+
+        alt_post = config.request_execution(
+            '/post/', {}, {'accept': 'application/x-alt'})
+        self.assertEqual(
+            str(alt_post.locals['__root__']), std_root.name,
+            'not equal to std_root.name',
+        )

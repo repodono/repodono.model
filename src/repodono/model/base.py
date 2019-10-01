@@ -541,10 +541,12 @@ class BaseBucketDefinition(object):
     for all BucketDefinition types.
     """
 
-    def __init__(self, roots, environment):
+    def __init__(self, name, roots, environment):
         """
         Arguments
 
+        name
+            Name of this bucket.
         roots
             A list of roots that the content to be served from this
             bucket may be resolved from.
@@ -553,6 +555,7 @@ class BaseBucketDefinition(object):
             string and values implement __contains__
         """
 
+        self.name = name
         self.roots = roots
         self.environment = environment
 
@@ -590,8 +593,8 @@ class BaseBucketDefinitionMapping(BasePreparedMapping):
         pass
 
     @classmethod
-    def create_bucket_definition(cls, roots, environment):
-        return cls.BucketDefinition(roots, environment)
+    def create_bucket_definition(cls, name, roots, environment):
+        return cls.BucketDefinition(name, roots, environment)
 
     @classmethod
     def prepare_from_item(cls, key, value):
@@ -601,7 +604,7 @@ class BaseBucketDefinitionMapping(BasePreparedMapping):
         if not roots:
             raise ValueError('__roots__ must be defined')
 
-        return cls.create_bucket_definition(roots, environment)
+        return cls.create_bucket_definition(key, roots, environment)
 
 
 class BucketDefinitionMapping(
@@ -705,12 +708,15 @@ class BaseEndpointDefinition(object):
     for all EndpointDefinition types.
     """
 
-    def __init__(self, route, provider, root, kwargs_mapping, environment):
+    def __init__(self, route, bucket_name, provider, root,
+                 kwargs_mapping, environment):
         """
         Arguments:
 
         route
             The route, typically this should be a URI Template.
+        bucket_name
+            The name of the bucket that this endpoint is declared in.
         provider
             Specifies the name that will be retrieved from the execution
             locals to provide the data to be served from this end point.
@@ -738,6 +744,7 @@ class BaseEndpointDefinition(object):
         """
 
         self.route = route
+        self.bucket_name = bucket_name
         # the name will be referenced by the endpoint execution locals
         # resolver to allow the kwarg_mapping to be applied.
         self.name = provider
@@ -787,6 +794,14 @@ class BaseEndpointDefinitionMapping(BasePreparedMapping):
     prepared or deferred.
     """
 
+    def __init__(self, value, bucket_name):
+        """
+        A bucket name for this set must be specified.
+        """
+
+        self.bucket_name = bucket_name
+        super().__init__(value)
+
     # internal class structure similar to the resource definition
     # version for the mean time.
 
@@ -795,12 +810,12 @@ class BaseEndpointDefinitionMapping(BasePreparedMapping):
 
     @classmethod
     def create_endpoint_definition(
-            cls, route, provider, root, kwargs_mapping, environment):
+            cls, route, bucket_name, provider, root, kwargs_mapping,
+            environment):
         return cls.EndpointDefinition(
-            route, provider, root, kwargs_mapping, environment)
+            route, bucket_name, provider, root, kwargs_mapping, environment)
 
-    @classmethod
-    def prepare_from_item(cls, key, value):
+    def prepare_from_item(self, key, value):
         environment = dict(value)
         provider = environment.pop('__provider__', None)
         kwargs_mapping = environment.pop('__kwargs__', {})
@@ -812,8 +827,10 @@ class BaseEndpointDefinitionMapping(BasePreparedMapping):
         if not provider:
             raise ValueError('__provider__ must be defined')
 
-        return cls.create_endpoint_definition(
-            route, provider, root, kwargs_mapping, environment)
+        return self.create_endpoint_definition(
+            route, self.bucket_name, provider, root,
+            kwargs_mapping, environment
+        )
 
 
 class EndpointDefinitionMapping(
@@ -839,7 +856,7 @@ class EndpointDefinitionSetMapping(PreparedMapping):
 
     @classmethod
     def prepare_from_item(self, key, value):
-        return EndpointDefinitionMapping(value)
+        return EndpointDefinitionMapping(value, bucket_name=key)
 
 
 class ObjectInstantiationMapping(PreparedMapping):
@@ -1108,6 +1125,9 @@ class EndpointExecutionLocals(ExecutionLocals):
     mapping defined for it will come into effect.
     """
 
+    # TODO consider replacing mappings with the arguments that go into
+    # the original Execution object.
+
     def __init__(self, mappings, endpoint, remap, default):
         self.__endpoint = endpoint
         self.__remap = remap
@@ -1160,8 +1180,16 @@ class Execution(object):
         self.resources = resources
         self.endpoint_mapping = endpoint_mapping
         self.locals = EndpointExecutionLocals([
+            # TODO figure out further reserved bindings and formalise
+            # the system for this.
             {
+                # Also ensure the "dynamic" locally bounded version is
+                # also available.
                 '__route__': endpoint.route,
+                '__root__': endpoint.root,
+                # XXX TODO provide a path of some kind associated with
+                # this resource from endpoint, e.g. join with __root__
+                # '__path__': endpoint.route,
             },
             environment,
             endpoint.environment,

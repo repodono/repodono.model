@@ -7,6 +7,7 @@ from ast import literal_eval
 from repodono.model.base import (
     BaseMapping,
     BasePreparedMapping,
+    BoundedMappingProxy,
     BaseResourceDefinition,
     PathMapping,
     DeferredComputedMapping,
@@ -150,6 +151,26 @@ class BaseMappingTestCase(unittest.TestCase):
 
         with self.assertRaises(TypeError):
             dcm['object'] = object()
+
+
+class BoundedMappingProxyTestCase(unittest.TestCase):
+
+    def test_base(self):
+        original = {}
+        empty = BoundedMappingProxy(original, id)
+        self.assertEqual(0, len(empty))
+        self.assertNotIn(0, empty)
+        self.assertEqual(empty.original, original)
+
+        with self.assertRaises(TypeError):
+            empty.original['hi'] = True
+
+        single = {'empty': empty}
+        mapping = BoundedMappingProxy(single, id)
+        self.assertEqual(1, len(mapping))
+        self.assertIn('empty', mapping)
+        self.assertEqual(id(empty), mapping['empty'])
+        self.assertEqual(mapping.original, single)
 
 
 class FlatGroupedMappingTestCase(unittest.TestCase):

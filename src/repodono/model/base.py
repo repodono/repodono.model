@@ -219,6 +219,36 @@ class AttributeFlatGroupedMapping(FlatGroupedMapping, AttributeMapping):
     """
 
 
+class BoundedMappingProxy(Mapping):
+    """
+    Represents a generic bounded mapping
+
+    mapping
+        The mapping whose value are to be bounded by the binder.
+
+    binder
+        The callable that will bind the values of the mapping.
+    """
+
+    def __init__(self, mapping, binder):
+        self.__mapping = MappingProxyType({
+            k: binder(v) for k, v in mapping.items()
+        })
+        self.original = MappingProxyType(mapping)
+
+    def __getitem__(self, key):
+        return self.__mapping[key]
+
+    def __iter__(self):
+        return iter(self.__mapping)
+
+    def __len__(self):
+        return len(list(iter(self)))
+
+    def __contains__(self, key):
+        return key in self.__mapping
+
+
 class BasePreparedMapping(BaseMapping):
     """
     This base class provides a prepare_from_item classmethod which

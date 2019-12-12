@@ -96,3 +96,15 @@ class BindingProtocolTestCase(unittest.TestCase):
         # again, accessing the other permitted unwrapped (original)
         # instance will not be an issue
         self.assertIs(MappedExtThing(thing).unwrapped, thing)
+
+    def test_modified(self):
+        thing = ExtThing('foo')
+        mapping = {}
+
+        mapped_thing = MappedExtThing(thing).bind(mapping)
+        with self.assertRaises(KeyError):
+            # failure only happens during access
+            mapped_thing.path
+
+        mapping['foo'] = '/some/where/to/foo'
+        self.assertEqual(mapped_thing.path, '/some/where/to/foo')

@@ -9,12 +9,14 @@ from functools import partial
 
 class partialproperty(property):
     """
-    This property assumes the provided callable is a partial that can be
-    invoked with zero arguments.
+    This property assumes the provided callable is constructed in the
+    specific specification that correctly wraps around the functions'
+    defined in the metaclasses that serves to resolve to the actual
+    bounded value based on the inputs.
     """
 
     def __get__(self, name, owner):
-        return self.fget()
+        return self.fget.func(self.fget.args[0], self.fget.args[1]())
 
 
 class ProxyBase(object):
@@ -66,7 +68,8 @@ class MappingBinderMeta(type):
             full_kwargs = {}
             full_kwargs.update(kwargs)
             full_kwargs.update({
-                k: partialproperty(partial(v, mapping, getattr(inst, k)))
+                k: partialproperty(
+                    partial(v, mapping, partial(getattr, inst, k)))
                 for k, v in vars(metaclass).items()
                 if not k.startswith('_') and callable(v)
             })

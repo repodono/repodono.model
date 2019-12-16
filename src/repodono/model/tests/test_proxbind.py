@@ -108,3 +108,24 @@ class BindingProtocolTestCase(unittest.TestCase):
 
         mapping['foo'] = '/some/where/to/foo'
         self.assertEqual(mapped_thing.path, '/some/where/to/foo')
+
+        thing.path = 'bar'
+
+        # original thing being modified will have an effect
+        with self.assertRaises(KeyError):
+            # failure only happens during access
+            mapped_thing.path
+
+        mapping['bar'] = '/some/where/to/bar'
+        self.assertEqual(mapped_thing.path, '/some/where/to/bar')
+
+    def test_ducked_out_types(self):
+        # For cases where the source object does not have the attribute
+        # for the binding process.
+        mapping = {'foo': '/some/foo'}
+        thing = Thing('foo')
+        mapped_thing = MappedExtThing(thing).bind(mapping)
+        self.assertEqual(mapped_thing.path, '/some/foo')
+
+        with self.assertRaises(AttributeError):
+            mapped_thing.paths

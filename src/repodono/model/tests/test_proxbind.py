@@ -23,6 +23,18 @@ class ExtThing(Thing):
         return (self.path, self.paths,)
 
 
+class ReuseAttr(object):
+    """
+    A class that define attributes that will require remapping but have
+    special meaning defined by the protocol/metaclass.
+    """
+
+    def __init__(self, bind, bounded, unwrapped):
+        self.bind = bind
+        self.bounded = bounded
+        self.unwrapped = unwrapped
+
+
 class MappedExtThingMeta(MappingBinderMeta):
     """
     Demonstrates how to implement mapping from a provided mapping to the
@@ -42,6 +54,27 @@ class MappedExtThing(ExtThing, metaclass=MappedExtThingMeta):
     """
     The final MappedExtThing class set up with the API as defined by
     the classes provided by the proxbind module.
+    """
+
+
+class ReuseAttrMeta(MappingBinderMeta):
+    """
+    Rebind the attributes with special meaning in the system.
+    """
+
+    def bind(mapping, attr_value):
+        return 'bind(%s)' % mapping[attr_value]
+
+    def bounded(mapping, attr_value):
+        return 'bounded(%s)' % mapping[attr_value]
+
+    def unwrapped(mapping, attr_value):
+        return 'unwrapped(%s)' % mapping[attr_value]
+
+
+class MappedReuseAttr(ReuseAttr, metaclass=ReuseAttrMeta):
+    """
+    The actual usable class for testing.
     """
 
 
@@ -129,3 +162,18 @@ class BindingProtocolTestCase(unittest.TestCase):
 
         with self.assertRaises(AttributeError):
             mapped_thing.paths
+
+    def test_preserved_reused_mappings(self):
+        mapping = {
+            'one': 1,
+            'two': 2,
+            'three': 3,
+        }
+        base_attrs = ReuseAttr(bind='one', bounded='two', unwrapped='three')
+        attr_tester = MappedReuseAttr(base_attrs).bind(mapping)
+        # prove that classes/objects providing attributes with the same
+        # names as names in this metaclass do not conflict in actual
+        # usage.
+        self.assertEqual(attr_tester.bind, 'bind(1)')
+        self.assertEqual(attr_tester.bounded, 'bounded(2)')
+        self.assertEqual(attr_tester.unwrapped, 'unwrapped(3)')

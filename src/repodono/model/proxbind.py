@@ -57,6 +57,9 @@ class MappingBinderMeta(type):
         for each instance
         """
 
+        base_kwargs = {}
+        base_kwargs.update(kwargs)
+
         # Various functions that will become methods for the classes to
         # be constructed that will provide the framework for defining
         # unbounded and bounded instances of the class.
@@ -66,7 +69,7 @@ class MappingBinderMeta(type):
             # inst will be the actual object to be wrapped.
             inst = self.unwrapped
             full_kwargs = {}
-            full_kwargs.update(kwargs)
+            full_kwargs.update(base_kwargs)
             full_kwargs.update({
                 k: partialproperty(
                     partial(v, mapping, partial(getattr, inst, k)))
@@ -95,7 +98,7 @@ class MappingBinderMeta(type):
 
         # Bounded class will not take part or contain the actual
         # metaclass as only the wrapper needs to be marked as such.
-        bounded_base = type(name, bases, kwargs)
+        bounded_base = type(name, bases, base_kwargs)
         bounded_base.__abstractmethods__ = frozenset(['__init__'])
         unbounded_class = super().__new__(
             metaclass, 'Unbounded' + name, (proxy_base,), {

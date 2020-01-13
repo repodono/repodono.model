@@ -606,24 +606,6 @@ class BaseBucketDefinitionMapping(BasePreparedMapping):
 
         return cls.create_bucket_definition(key, roots, environment)
 
-
-class BucketDefinitionMapping(
-        BaseBucketDefinitionMapping, PreparedMapping):
-    """
-    The bucket mapping defines a mapping of available buckets for this
-    system.  A bucket is a "profile" for an endpoint definition set,
-    which must have a corresponding bucket.  A bucket defines a list of
-    roots which may be resolved for statically served content, plus
-    additional keys which serves as condition for the activation of the
-    endpoint set and its associated bucket.
-
-    The set of keys that serve as the condition will be specific to the
-    runner of the application stack.  One example would be the "accept"
-    key with a list of mimetype as its value, which when provided by
-    some user-agent, would activiate this particular bucket/end point
-    set.
-    """
-
     # TODO formalise the implementation of this through some API?
     default_key = '_'
 
@@ -646,6 +628,24 @@ class BucketDefinitionMapping(
             (bucket.match(mapping), (key, bucket))
             for key, bucket in self.items()) if score), reverse=True)
         return key_buckets if key_buckets else [(_, self[_])]
+
+
+class BucketDefinitionMapping(
+        BaseBucketDefinitionMapping, PreparedMapping):
+    """
+    The bucket mapping defines a mapping of available buckets for this
+    system.  A bucket is a "profile" for an endpoint definition set,
+    which must have a corresponding bucket.  A bucket defines a list of
+    roots which may be resolved for statically served content, plus
+    additional keys which serves as condition for the activation of the
+    endpoint set and its associated bucket.
+
+    The set of keys that serve as the condition will be specific to the
+    runner of the application stack.  One example would be the "accept"
+    key with a list of mimetype as its value, which when provided by
+    some user-agent, would activiate this particular bucket/end point
+    set.
+    """
 
 
 class BaseReMappingDefinition(object):

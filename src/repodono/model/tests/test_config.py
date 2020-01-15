@@ -1074,42 +1074,30 @@ class ConfigIntegrationTestCase(unittest.TestCase):
 
     # __root__ and path and other filesystem interaction tests
 
-    def test_config_root_usage(self):
-        with self.assertRaises(TypeError) as e:
-            Configuration.from_toml("""
-            [environment.variable]
-            root = "foo"
-
-            [bucket._]
-            __roots__ = ['root']
-            """)
-
-        self.assertEqual(
-            e.exception.args[0],
-            "'root' must be declared under environment.paths, "
-            "referenced by bucket '_'",
-            # TODO should list which bucket, i.e. in [bucket._],...
-        )
-
     def test_config_bucket_roots_usage(self):
         with self.assertRaises(TypeError) as e:
-            Configuration.from_toml("""
+            config = Configuration.from_toml("""
             [environment.variable]
             root = "foo"
 
             [bucket._]
             __roots__ = ['root']
             """)
+            config.bucket['_'].roots
 
         self.assertEqual(
             e.exception.args[0],
-            "'root' must be declared under environment.paths, "
-            "referenced by bucket '_'",
+            "'root' must be declared under environment.paths",
+
+            # TODO ideally this can be done, if we have more provenance
+            # information as to where exactly the value was defined.
+            # "'root' must be declared under environment.paths, "
+            # "referenced by bucket '_'",
         )
 
     def test_config_endpoint_root_usage(self):
         with self.assertRaises(TypeError) as e:
-            Configuration.from_toml("""
+            config = Configuration.from_toml("""
             [environment.variable]
             root = "foo"
 
@@ -1117,11 +1105,12 @@ class ConfigIntegrationTestCase(unittest.TestCase):
             __provider__ = 'root'
             __root__ = 'root'
             """)
+            config.endpoint['_']['/'].root
 
         self.assertEqual(
             e.exception.args[0],
-            "'root' must be declared under environment.paths, "
-            "referenced by endpoint definition '_.\"/\"'"
+            "'root' must be declared under environment.paths",
+            # see above TODO
         )
 
     def test_root_resolution(self):

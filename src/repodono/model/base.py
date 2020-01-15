@@ -13,6 +13,8 @@ from collections import (
 
 from pkg_resources import EntryPoint
 
+from repodono.model.proxbind import MappingBinderMeta
+
 
 def map_vars_value(value, vars_):
     # these are assumed to be produced by the toml/json loads,
@@ -575,6 +577,28 @@ class BaseBucketDefinition(object):
             # should even be handled?!
 
 
+class BaseBucketDefinitionMeta(MappingBinderMeta):
+
+    def roots(mapping, attr_value):
+        def find_root(root):
+            result = mapping.get(root)
+            if not isinstance(result, Path):
+                # TODO explicitly refer to which section/bucket this was
+                # declared under
+                raise TypeError(
+                    "'%s' must be declared under environment.paths" % root)
+            return result
+
+        return [find_root(root) for root in attr_value]
+
+
+class BoundedBucketDefinition(
+        BaseBucketDefinition, metaclass=BaseBucketDefinitionMeta):
+    """
+    The singular bounded bucket definition
+    """
+
+
 class BaseBucketDefinitionMapping(BasePreparedMapping):
     """
     This defines the base bucket definition mapping, where the value
@@ -648,6 +672,12 @@ class BucketDefinitionMapping(
     """
 
 
+class BoundedBucketDefinitionMapping(BaseBucketDefinitionMapping):
+    """
+    Marker class used internally for the above.
+    """
+
+
 class BaseReMappingDefinition(object):
     """
     The BaseReMappingDefinition class.  More of a marker/common ancestor
@@ -709,7 +739,7 @@ class BaseEndpointDefinition(object):
     """
 
     def __init__(self, route, bucket_name, provider, root,
-                 kwargs_mapping, environment):
+                 kwargs_mapping, environment, bucket_mapping=None):
         """
         Arguments:
 
@@ -741,6 +771,13 @@ class BaseEndpointDefinition(object):
         environment
             The mapping of an environment variables specific to this
             endpoint definition.
+
+        Optional Arguments:
+
+        bucket_mapping
+            An instance BucketDefinitionMapping - if supplied, it is
+            used to define an alternative value to the `root` attribute,
+            if the value supplied was None.
         """
 
         self.route = route
@@ -749,9 +786,33 @@ class BaseEndpointDefinition(object):
         # resolver to allow the kwarg_mapping to be applied.
         self.name = provider
         self.provider = attrgetter(provider)
-        self.root = root
+        if (root is None and bucket_mapping and
+                bucket_name in bucket_mapping and
+                bucket_mapping[bucket_name].roots):
+            self.root = bucket_mapping[bucket_name].roots[0]
+        else:
+            self.root = root
         self.kwargs_mapping = kwargs_mapping
         self.environment = environment
+
+
+class BaseEndpointDefinitionMeta(MappingBinderMeta):
+
+    def root(mapping, attr_value):
+        result = mapping.get(attr_value)
+        if not isinstance(result, Path):
+            # TODO explicitly refer to which section/bucket this was
+            # declared under
+            raise TypeError(
+                "'%s' must be declared under environment.paths" % attr_value)
+        return result
+
+
+class BoundedEndpointDefinition(
+        BaseEndpointDefinition, metaclass=BaseEndpointDefinitionMeta):
+    """
+    The singular bounded bucket definition
+    """
 
 
 class BaseEndpointDefinitionMapping(BasePreparedMapping):
@@ -794,12 +855,13 @@ class BaseEndpointDefinitionMapping(BasePreparedMapping):
     prepared or deferred.
     """
 
-    def __init__(self, value, bucket_name):
+    def __init__(self, value, bucket_name, bucket_mapping=None):
         """
         A bucket name for this set must be specified.
         """
 
         self.bucket_name = bucket_name
+        self.bucket_mapping = bucket_mapping
         super().__init__(value)
 
     # internal class structure similar to the resource definition
@@ -811,9 +873,10 @@ class BaseEndpointDefinitionMapping(BasePreparedMapping):
     @classmethod
     def create_endpoint_definition(
             cls, route, bucket_name, provider, root, kwargs_mapping,
-            environment):
+            environment, bucket_mapping=None):
         return cls.EndpointDefinition(
-            route, bucket_name, provider, root, kwargs_mapping, environment)
+            route, bucket_name, provider, root, kwargs_mapping, environment,
+            bucket_mapping=bucket_mapping)
 
     def prepare_from_item(self, key, value):
         environment = dict(value)
@@ -829,7 +892,7 @@ class BaseEndpointDefinitionMapping(BasePreparedMapping):
 
         return self.create_endpoint_definition(
             route, self.bucket_name, provider, root,
-            kwargs_mapping, environment
+            kwargs_mapping, environment, self.bucket_mapping,
         )
 
 
@@ -845,6 +908,12 @@ class EndpointDefinitionMapping(
 
     Any remaining keys will be additional environment values available
     in the context of that endpoint.
+    """
+
+
+class BoundedEndpointDefinitionMapping(BaseEndpointDefinitionMapping):
+    """
+    Bounded version of the endpoint definition mapping
     """
 
 

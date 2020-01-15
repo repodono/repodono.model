@@ -12,6 +12,7 @@ from repodono.model.base import (
     BucketDefinitionMapping,
     ReMappingDefinitionMapping,
     EndpointDefinitionSetMapping,
+    EndpointDefinitionMapping,
 )
 
 
@@ -73,6 +74,18 @@ class Bucket(StructuredMapping((
     [[Bucket]]
     bucket = "repodono.model.base:BucketDefinitionMapping"
     """
+
+    @property
+    def Endpoint(bucket_mapping):
+        class BucketEndpointDefinitionSetMapping(EndpointDefinitionSetMapping):
+            @classmethod
+            def prepare_from_item(self, key, value):
+                return EndpointDefinitionMapping(
+                    value, bucket_name=key, bucket_mapping=bucket_mapping)
+
+        return StructuredMapping((
+            ('endpoint', BucketEndpointDefinitionSetMapping),
+        ))
 
 
 class Localmap(StructuredMapping((

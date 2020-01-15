@@ -4,13 +4,17 @@ The confiration classes for the repodono framework.
 
 import logging
 import toml
-from pathlib import Path
 
 from repodono.model.base import (
     BaseMapping,
     Execution,
     RouteTrieMapping,
     CompiledRouteResourceDefinitionMapping,
+
+    BoundedBucketDefinition,
+    BoundedBucketDefinitionMapping,
+    BoundedEndpointDefinition,
+    BoundedEndpointDefinitionMapping,
 )
 from repodono.model.mappings import (
     Environment,
@@ -18,7 +22,6 @@ from repodono.model.mappings import (
     Bucket,
     Localmap,
     Resource,
-    Endpoint,
 )
 from repodono.model.routing import URITemplateRouter
 
@@ -60,7 +63,7 @@ class Configuration(BaseConfiguration):
         self.bucket = Bucket(self)
         self.localmap = Localmap(self)
         self.resource = Resource(self)
-        self.endpoint = Endpoint(self)
+        self.endpoint = self.bucket.Endpoint(self)
         self.compile()
 
     @property
@@ -92,64 +95,26 @@ class Configuration(BaseConfiguration):
         self.compile_bucket()
 
     def compile_bucket(self):
-        def find_root(root):
-            result = self.environment.get(root)
-            if not isinstance(result, Path):
-                # TODO explicitly refer to which section/bucket this was
-                # declared under
-                raise TypeError(
-                    "'%s' must be declared under environment.paths" % root)
-            return result
+        # Since it's too painful to bind mapping of one type to another
+        # based on the same proxybind framework because of how types
+        # (don't) work in Python, the mapping must be reconstructed
+        # using the individual items.
+        self.bucket = BoundedBucketDefinitionMapping({
+            k: BoundedBucketDefinition(v).bind(self.environment)
+            for k, v in self.bucket.items()
+        })
 
-        for bucket in self.bucket.values():
-            # TODO figure out if this replacement like so is ideal.
-            try:
-                bucket.roots = [find_root(root) for root in bucket.roots]
-            except TypeError as e:
-                raise TypeError(
-                    "%s, referenced by bucket '%s'" %
-                    (e.args[0], bucket.name)
-                ) from None
-
-        # TODO do we touch the endpoint definitions here?
-        # XXX figure out if this is sane?
-        for bucket_name, endpoint_definitions in self.endpoint.items():
-            if bucket_name not in self.bucket:
-                logger.warning(
-                    "endpoint set '%s' does not have a corresponding bucket "
-                    "defined", bucket_name
-                )
-                # XXX need to untangle this level of nested handling
-                bucket = None
-                default_root = None
-            else:
-                bucket = self.bucket[bucket_name]
-                default_root = bucket.roots[0] if bucket.roots else None
-
-            for endpoint_definition in endpoint_definitions.values():
-                if endpoint_definition.root:
-                    try:
-                        endpoint_definition.root = find_root(
-                          endpoint_definition.root)
-                    except TypeError as e:
-                        raise TypeError(
-                            "%s, referenced by endpoint definition "
-                            "'%s.\"%s\"'" %
-                            (e.args[0], bucket_name, endpoint_definition.route)
-                        ) from None
-                else:
-                    if default_root:
-                        endpoint_definition.root = default_root
-                    else:
-                        logger.info(
-                            "bucket {bucket_name} has no roots defined and "
-                            "endpoint {route} at endpoint set {bucket_name} "
-                            "has no default root defined",
-                            bucket_name=bucket_name,
-                            route=endpoint_definition.route,
-                        )
-                        # XXX is this even correct?
-                        endpoint_definition.root = None
+        self.endpoint = {
+            k: BoundedEndpointDefinitionMapping(
+                {
+                    bucket: BoundedEndpointDefinition(v).bind(self.environment)
+                    for bucket, v in edsmap.items()
+                },
+                bucket_name=edsmap.bucket_name,
+                bucket_mapping=edsmap.bucket_mapping,
+            )
+            for k, edsmap in self.endpoint.items()
+        }
 
     def request_execution(
             self, route, mapping, bucket_mapping={},

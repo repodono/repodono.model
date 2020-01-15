@@ -1274,6 +1274,31 @@ class EndpointDefinitionMappingTestCase(unittest.TestCase):
         })
         self.assertEqual(definition.route, '/some/path/{id}')
 
+    def test_usage_with_bucket_definition_mapping(self):
+        bucket_mapping = BucketDefinitionMapping({
+            '_': {
+                '__roots__': ['default_root'],
+                'accept': ['*/*'],
+            },
+        })
+        mapping = EndpointDefinitionMapping({
+            '/some/path/{id}': {
+                '__provider__': 'some_provider',
+                'key': 'some_value',
+                'target': 'some_other_value',
+            },
+            '/some/path/{id}/details': {
+                '__root__': 'some_other_root',
+                '__provider__': 'some_provider',
+            },
+        }, bucket_name='_', bucket_mapping=bucket_mapping)
+
+        # since the additional information is supplied
+        self.assertEqual(
+            mapping['/some/path/{id}'].root, 'default_root')
+        self.assertEqual(
+            mapping['/some/path/{id}/details'].root, 'some_other_root')
+
 
 class ReMappingDefinitionMappingTestCase(unittest.TestCase):
 

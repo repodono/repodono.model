@@ -1,8 +1,9 @@
 import unittest
 from operator import attrgetter
-from pathlib import Path
+from pathlib import Path, PurePath
 from functools import partial
 from ast import literal_eval
+from tempfile import TemporaryDirectory
 
 from repodono.model.base import (
     BaseMapping,
@@ -23,6 +24,7 @@ from repodono.model.base import (
     BaseBucketDefinition,
     BucketDefinitionMapping,
     EndpointDefinitionMapping,
+    BoundedEndpointDefinition,
     ReMappingDefinitionMapping,
     RouteTrieMapping,
     structured_mapper,
@@ -1298,6 +1300,107 @@ class EndpointDefinitionMappingTestCase(unittest.TestCase):
             mapping['/some/path/{id}'].root, 'default_root')
         self.assertEqual(
             mapping['/some/path/{id}/details'].root, 'some_other_root')
+
+
+class BoundedEndpointDefinitionTestCase(unittest.TestCase):
+
+    def test_build_fs_cache_path_simple(self):
+        # create the required mappings
+        default_root = TemporaryDirectory()
+        self.addCleanup(default_root.cleanup)
+        bucket_mapping = BucketDefinitionMapping({
+            '_': {
+                '__roots__': ['default_root'],
+                'accept': ['*/*'],
+            },
+        })
+        mapping = EndpointDefinitionMapping({
+            '/some/path/{id}': {
+                '__provider__': 'some_provider',
+            },
+        }, bucket_name='_', bucket_mapping=bucket_mapping)
+
+        self.assertEqual(
+            NotImplemented, mapping['/some/path/{id}'].build_cache_path({}))
+
+        # manually bind one
+        ed = BoundedEndpointDefinition(mapping['/some/path/{id}']).bind({
+            'default_root': Path(default_root.name)
+        })
+        self.assertEqual(
+            PurePath(default_root.name) / 'some' / 'path' / '3',
+            ed.build_cache_path({'id': '3'}),
+        )
+
+    # Can't exactly test this when __root__ seems to be required
+    #
+    # def test_build_fs_cache_rootless(self):
+    #     default_root = TemporaryDirectory()
+    #     self.addCleanup(default_root.cleanup)
+    #     bucket_mapping = BucketDefinitionMapping({
+    #         '_': {
+    #             '__roots__': ['default_root'],
+    #             'accept': ['*/*'],
+    #         },
+    #     })
+    #     mapping = EndpointDefinitionMapping({
+    #         '/target/{id}': {
+    #             '__provider__': 'some_provider',
+    #             '__root__': None,
+    #         },
+    #     }, bucket_name='_', bucket_mapping=bucket_mapping)
+    #     ed = BoundedEndpointDefinition(mapping['/target/{id}']).bind({
+    #         'default_root': Path(default_root.name)
+    #     })
+    #     self.assertIsNone(ed.build_cache_path({'id': '42'}))
+
+    def test_build_fs_cache_errors(self):
+        default_root = TemporaryDirectory()
+        self.addCleanup(default_root.cleanup)
+        bucket_mapping = BucketDefinitionMapping({
+            '_': {
+                '__roots__': ['default_root'],
+                'accept': ['*/*'],
+            },
+        })
+        mapping = EndpointDefinitionMapping({
+            '/path{/some_path*}': {
+                '__provider__': 'some_provider',
+            },
+        }, bucket_name='_', bucket_mapping=bucket_mapping)
+
+        # manually bind one
+        ed = BoundedEndpointDefinition(mapping['/path{/some_path*}']).bind({
+            'default_root': Path(default_root.name)
+        })
+        with self.assertRaises(ValueError):
+            ed.build_cache_path({'some_path': ['some', 'where', '..', 'oops']})
+
+    # def test_end_as_directory_error(self):
+    #     default_root = TemporaryDirectory()
+    #     self.addCleanup(default_root.cleanup)
+    #     bucket_mapping = BucketDefinitionMapping({
+    #         '_': {
+    #             '__roots__': ['default_root'],
+    #             'accept': ['*/*'],
+    #         },
+    #     })
+    #     mapping = EndpointDefinitionMapping({
+    #         '/thing/{id}/broken/': {
+    #             '__provider__': 'some_provider',
+    #         },
+    #         '/thing/{id}/lists/': {
+    #             '__provider__': 'some_provider',
+    #             '__file__': 'index.html',
+    #         },
+    #         '/thing/{id}/lists/foo': {
+    #             '__provider__': 'some_provider',
+    #         },
+    #     }, bucket_name='_', bucket_mapping=bucket_mapping)
+    #     # /thing/1/lists/ should be a directory
+    #     ed = BoundedEndpointDefinition(mapping['/thing/{id}/lists/']).bind({
+    #         'default_root': Path(default_root.name)
+    #     })
 
 
 class ReMappingDefinitionMappingTestCase(unittest.TestCase):

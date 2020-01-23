@@ -12,6 +12,7 @@ from collections import (
 )
 
 from pkg_resources import EntryPoint
+from uritemplate import URITemplate
 
 from repodono.model.proxbind import MappingBinderMeta
 
@@ -778,14 +779,22 @@ class BaseEndpointDefinition(object):
             An instance BucketDefinitionMapping - if supplied, it is
             used to define an alternative value to the `root` attribute,
             if the value supplied was None.
+        filename
+            The name of the associated file, if and only if the provided
+            route ends with '/'.
+
+            If this is not supplied, build_cache_path will not return a
+            usable value.
         """
 
         self.route = route
+        self.route_uritemplate = URITemplate(route)
         self.bucket_name = bucket_name
         # the name will be referenced by the endpoint execution locals
         # resolver to allow the kwarg_mapping to be applied.
         self.name = provider
         self.provider = attrgetter(provider)
+        # TODO maybe root might be NotImplemented?
         if (root is None and bucket_mapping and
                 bucket_name in bucket_mapping and
                 bucket_mapping[bucket_name].roots):
@@ -794,6 +803,10 @@ class BaseEndpointDefinition(object):
             self.root = root
         self.kwargs_mapping = kwargs_mapping
         self.environment = environment
+
+    def build_cache_path(self, mapping):
+        # see the bounded version
+        return NotImplemented
 
 
 class BaseEndpointDefinitionMeta(MappingBinderMeta):
@@ -811,8 +824,32 @@ class BaseEndpointDefinitionMeta(MappingBinderMeta):
 class BoundedEndpointDefinition(
         BaseEndpointDefinition, metaclass=BaseEndpointDefinitionMeta):
     """
-    The singular bounded bucket definition
+    The singular bounded endpoint definition
     """
+
+    def build_cache_path(self, mapping):
+        """
+        For a bounded endpoint definition, it becomes possible to locate
+        the actual path where the referenced resource on the filesystem.
+        However, this implementation will simply join the root with
+        expanded uri using this endpoint definition's uritemplate - this
+        means that for a page that ends with a `/`, some other form of
+        disambiguation external to here will be required by the users of
+        this class (e.g. appending index.html in the case of html).
+        """
+
+        # TODO if root might be NotImplemented?
+        # if not self.root:
+        #     return None
+
+        fragments = self.route_uritemplate.expand(**mapping).split('/')
+        if '..' in fragments:
+            # having '..' at this stage is undefined behavior, as the
+            # resolution of this item and what may be resolved will not
+            # match under circumstances involving symlinks.
+            raise ValueError("'..' found in path fragments")
+
+        return self.root.joinpath(*fragments)
 
 
 class BaseEndpointDefinitionMapping(BasePreparedMapping):
@@ -884,6 +921,9 @@ class BaseEndpointDefinitionMapping(BasePreparedMapping):
         kwargs_mapping = environment.pop('__kwargs__', {})
         # The __root__ key is not enforced by default; this is up to the
         # actual application runner to deal with and/or make use of.
+        # TODO is defaulting this to None intended?  There may need to be
+        # a way to explicitly unset this?
+        # TODO look into defaulting to NotImplemented
         root = environment.pop('__root__', None)
         route = key
 
@@ -1259,12 +1299,14 @@ class Execution(object):
                 # XXX TODO provide a path of some kind associated with
                 # this resource from endpoint, e.g. join with __root__
                 # '__path__': endpoint.route,
+                '__path__': endpoint.build_cache_path(endpoint_mapping),
             },
             environment,
             endpoint.environment,
             resources,
             dict(endpoint_mapping),
         ], endpoint, remap_mapping, self.default)
+        # import pdb;pdb.set_trace()
 
     def __call__(self):
         """

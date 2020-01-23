@@ -1,5 +1,5 @@
 import unittest
-from pathlib import Path
+from pathlib import Path, PurePath
 from tempfile import TemporaryDirectory
 
 from repodono.model.config import Configuration
@@ -1140,10 +1140,10 @@ class ConfigIntegrationTestCase(unittest.TestCase):
         __name__ = "mock"
         __init__ = "unittest.mock:Mock"
 
-        [endpoint._."/entry/"]
+        [endpoint._."/entry/view"]
         __provider__ = "mock"
 
-        [endpoint."alt"."/entry/"]
+        [endpoint."alt"."/entry/view"]
         __provider__ = "mock"
 
         [endpoint."alt"."/post/"]
@@ -1152,17 +1152,25 @@ class ConfigIntegrationTestCase(unittest.TestCase):
         """ % (std_root.name, alt_root.name))
 
         std_entry = config.request_execution(
-            '/entry/', {}, {'accept': 'text/plain'})
+            '/entry/view', {}, {'accept': 'text/plain'})
         self.assertEqual(
             str(std_entry.locals['__root__']), std_root.name,
             'not equal to std_root.name',
         )
+        self.assertEqual(
+            std_entry.locals['__path__'],
+            PurePath(std_root.name) / 'entry' / 'view'
+        )
 
         alt_entry = config.request_execution(
-            '/entry/', {}, {'accept': 'application/x-alt'})
+            '/entry/view', {}, {'accept': 'application/x-alt'})
         self.assertEqual(
             str(alt_entry.locals['__root__']), alt_root.name,
             'not equal to alt_root.name',
+        )
+        self.assertEqual(
+            alt_entry.locals['__path__'],
+            PurePath(alt_root.name) / 'entry' / 'view'
         )
 
         alt_post = config.request_execution(

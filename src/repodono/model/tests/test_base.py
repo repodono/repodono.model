@@ -1376,31 +1376,50 @@ class BoundedEndpointDefinitionTestCase(unittest.TestCase):
         with self.assertRaises(ValueError):
             ed.build_cache_path({'some_path': ['some', 'where', '..', 'oops']})
 
-    # def test_end_as_directory_error(self):
-    #     default_root = TemporaryDirectory()
-    #     self.addCleanup(default_root.cleanup)
-    #     bucket_mapping = BucketDefinitionMapping({
-    #         '_': {
-    #             '__roots__': ['default_root'],
-    #             'accept': ['*/*'],
-    #         },
-    #     })
-    #     mapping = EndpointDefinitionMapping({
-    #         '/thing/{id}/broken/': {
-    #             '__provider__': 'some_provider',
-    #         },
-    #         '/thing/{id}/lists/': {
-    #             '__provider__': 'some_provider',
-    #             '__file__': 'index.html',
-    #         },
-    #         '/thing/{id}/lists/foo': {
-    #             '__provider__': 'some_provider',
-    #         },
-    #     }, bucket_name='_', bucket_mapping=bucket_mapping)
-    #     # /thing/1/lists/ should be a directory
-    #     ed = BoundedEndpointDefinition(mapping['/thing/{id}/lists/']).bind({
-    #         'default_root': Path(default_root.name)
-    #     })
+    def test_end_as_directory_error(self):
+        default_root = TemporaryDirectory()
+        self.addCleanup(default_root.cleanup)
+        bucket_mapping = BucketDefinitionMapping({
+            '_': {
+                '__roots__': ['default_root'],
+                'accept': ['*/*'],
+            },
+        })
+        mapping = EndpointDefinitionMapping({
+            '/thing/{id}/broken/': {
+                '__provider__': 'some_provider',
+            },
+            '/thing/{id}/lists/': {
+                '__provider__': 'some_provider',
+                '__filename__': 'index.html',
+            },
+            '/thing/{id}/lists/foo': {
+                '__provider__': 'some_provider',
+                '__filename__': 'index.html',
+            },
+        }, bucket_name='_', bucket_mapping=bucket_mapping)
+        # /thing/1/broken/ should be a directory
+        broken = BoundedEndpointDefinition(
+            mapping['/thing/{id}/broken/']).bind({
+                'default_root': Path(default_root.name)})
+        self.assertIsNone(broken.build_cache_path({'id': '42'}))
+
+        good = BoundedEndpointDefinition(
+            mapping['/thing/{id}/lists/']).bind({
+                'default_root': Path(default_root.name)})
+        self.assertEqual(
+            PurePath(default_root.name) / 'thing' / '42' / 'lists' /
+            'index.html',
+            good.build_cache_path({'id': '42'})
+        )
+
+        ignored = BoundedEndpointDefinition(
+            mapping['/thing/{id}/lists/foo']).bind({
+                'default_root': Path(default_root.name)})
+        self.assertEqual(
+            PurePath(default_root.name) / 'thing' / '42' / 'lists' / 'foo',
+            ignored.build_cache_path({'id': '42'})
+        )
 
 
 class ReMappingDefinitionMappingTestCase(unittest.TestCase):

@@ -1,3 +1,4 @@
+from logging import getLogger
 from inspect import signature
 from functools import partial
 from operator import attrgetter
@@ -15,6 +16,8 @@ from pkg_resources import EntryPoint
 from uritemplate import URITemplate
 
 from repodono.model.proxbind import MappingBinderMeta
+
+logger = getLogger(__name__)
 
 
 def map_vars_value(value, vars_):
@@ -740,7 +743,8 @@ class BaseEndpointDefinition(object):
     """
 
     def __init__(self, route, bucket_name, provider, root,
-                 kwargs_mapping, environment, bucket_mapping=None):
+                 kwargs_mapping, environment,
+                 filename=None, bucket_mapping=None):
         """
         Arguments:
 
@@ -775,16 +779,16 @@ class BaseEndpointDefinition(object):
 
         Optional Arguments:
 
-        bucket_mapping
-            An instance BucketDefinitionMapping - if supplied, it is
-            used to define an alternative value to the `root` attribute,
-            if the value supplied was None.
         filename
             The name of the associated file, if and only if the provided
             route ends with '/'.
 
             If this is not supplied, build_cache_path will not return a
             usable value.
+        bucket_mapping
+            An instance BucketDefinitionMapping - if supplied, it is
+            used to define an alternative value to the `root` attribute,
+            if the value supplied was None.
         """
 
         self.route = route
@@ -803,6 +807,7 @@ class BaseEndpointDefinition(object):
             self.root = root
         self.kwargs_mapping = kwargs_mapping
         self.environment = environment
+        self.filename = filename
 
     def build_cache_path(self, mapping):
         # see the bounded version
@@ -848,6 +853,17 @@ class BoundedEndpointDefinition(
             # resolution of this item and what may be resolved will not
             # match under circumstances involving symlinks.
             raise ValueError("'..' found in path fragments")
+
+        if self.route.endswith('/'):
+            if self.filename:
+                return self.root.joinpath(*fragments) / self.filename
+            else:
+                logger.info(
+                    "route '%s' ends with '/' but no filename provided for "
+                    "the associated endpoint at bucket '%s'",
+                    self.route, self.bucket_name
+                )
+                return None
 
         return self.root.joinpath(*fragments)
 
@@ -910,10 +926,12 @@ class BaseEndpointDefinitionMapping(BasePreparedMapping):
     @classmethod
     def create_endpoint_definition(
             cls, route, bucket_name, provider, root, kwargs_mapping,
-            environment, bucket_mapping=None):
+            environment, filename=None, bucket_mapping=None):
         return cls.EndpointDefinition(
             route, bucket_name, provider, root, kwargs_mapping, environment,
-            bucket_mapping=bucket_mapping)
+            filename=filename,
+            bucket_mapping=bucket_mapping
+        )
 
     def prepare_from_item(self, key, value):
         environment = dict(value)
@@ -925,6 +943,7 @@ class BaseEndpointDefinitionMapping(BasePreparedMapping):
         # a way to explicitly unset this?
         # TODO look into defaulting to NotImplemented
         root = environment.pop('__root__', None)
+        filename = environment.pop('__filename__', None)
         route = key
 
         if not provider:
@@ -932,7 +951,8 @@ class BaseEndpointDefinitionMapping(BasePreparedMapping):
 
         return self.create_endpoint_definition(
             route, self.bucket_name, provider, root,
-            kwargs_mapping, environment, self.bucket_mapping,
+            kwargs_mapping, environment,
+            filename=filename, bucket_mapping=self.bucket_mapping,
         )
 
 
@@ -1291,6 +1311,7 @@ class Execution(object):
         self.locals = EndpointExecutionLocals([
             # TODO figure out further reserved bindings and formalise
             # the system for this.
+            # TODO make this first mapping lazy
             {
                 # Also ensure the "dynamic" locally bounded version is
                 # also available.

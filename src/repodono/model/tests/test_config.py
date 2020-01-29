@@ -261,6 +261,9 @@ class ConfigIntegrationTestCase(unittest.TestCase):
 
     def test_environment_shadowing(self):
         config_str = """
+        [environment.variables]
+        var = 0
+
         [environment.paths]
         foo = 'bar'
 
@@ -273,7 +276,7 @@ class ConfigIntegrationTestCase(unittest.TestCase):
         __roots__ = ["foo"]
 
         [endpoint._."/"]
-        __provider__ = "foo"
+        __provider__ = "var"
         """
 
         config = Configuration.from_toml(config_str)
@@ -285,6 +288,10 @@ class ConfigIntegrationTestCase(unittest.TestCase):
         self.assertEqual(str(exe.locals['foo']), 'bar')
         # auxilary check
         self.assertEqual(str(exe.locals['__root__']), 'bar')
+        # sample execution call
+        exe = config.request_execution('/', {})
+        self.assertEqual(0, exe.execute())
+        self.assertEqual(0, exe())
 
     def test_compiled_details(self):
         root = TemporaryDirectory()

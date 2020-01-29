@@ -1335,3 +1335,11 @@ class Execution(object):
         """
 
         return self.endpoint.provider(self.locals)
+
+    def __call__(self):
+        """
+        Default implementation simply return the result from calling
+        execute.
+        """
+
+        return self.execute()

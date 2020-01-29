@@ -1329,7 +1329,7 @@ class Execution(object):
         ], endpoint, remap_mapping, self.default)
         # import pdb;pdb.set_trace()
 
-    def __call__(self):
+    def execute(self):
         """
         Executes the instructions encoded in the endpoint object.
         """

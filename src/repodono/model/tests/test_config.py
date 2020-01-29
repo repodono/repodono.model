@@ -392,7 +392,7 @@ class ConfigIntegrationTestCase(unittest.TestCase):
         self.assertTrue(details.locals['details'])
         self.assertEqual(details.locals['format'], 'default')
         # testing the simple invocation.
-        self.assertEqual(details().path, 'default')
+        self.assertEqual(details.execute().path, 'default')
 
         json_details = config.request_execution(
             '/entry/{entry_id}/details', {'entry_id': '123'}, {
@@ -400,7 +400,7 @@ class ConfigIntegrationTestCase(unittest.TestCase):
             })
         self.assertEqual(json_details.locals['entry_viewer'].path, '123')
         self.assertEqual(json_details.locals['format'], 'simple')
-        self.assertEqual(json_details().path, 'simple')
+        self.assertEqual(json_details.execute().path, 'simple')
 
         xml_details = config.request_execution(
             '/entry/{entry_id}/details', {'entry_id': '123'}, {
@@ -408,7 +408,7 @@ class ConfigIntegrationTestCase(unittest.TestCase):
             })
         self.assertEqual(xml_details.locals['entry_viewer'].path, '123')
         self.assertEqual(xml_details.locals['format'], 'verbose')
-        self.assertEqual(xml_details().path, 'verbose')
+        self.assertEqual(xml_details.execute().path, 'verbose')
 
         with self.assertRaises(KeyError):
             config.request_execution(
@@ -418,7 +418,7 @@ class ConfigIntegrationTestCase(unittest.TestCase):
         # defined to access an attribute of this object.
         mock = config.environment['mock_object']
         mockobj_exe = config.request_execution('/mock_object', {})
-        some_attribute = mockobj_exe()
+        some_attribute = mockobj_exe.execute()
         # Verify that we have the same object.
         self.assertIs(some_attribute, mock.some_attribute)
         # Being an object, specifying that as a provider will simply
@@ -431,7 +431,7 @@ class ConfigIntegrationTestCase(unittest.TestCase):
         mockres_exe = config.request_execution('/mock_resource/{id}', {
             'id': '321',
         })
-        result = mockres_exe()
+        result = mockres_exe.execute()
         self.assertTrue(mock.mock_resource_attr.called)
         mock.mock_resource_attr.assert_called_with(path='321')
         self.assertIs(result, mockres_exe.locals['mock_resource_attr'])
@@ -653,7 +653,7 @@ class ConfigIntegrationTestCase(unittest.TestCase):
         exe = config.request_execution('/entry/', {})
         self.assertEqual(exe.locals['thing'].path, 'the value')
         # this would have simply access the value like above also
-        self.assertEqual(exe().path, 'the value')
+        self.assertEqual(exe.execute().path, 'the value')
 
         # this other view did not directly inititate or provide a value
         other_exe = config.request_execution('/entry/view', {})
@@ -712,11 +712,11 @@ class ConfigIntegrationTestCase(unittest.TestCase):
         # environment; note that 'some_reference' is not defined in this
         # set of execution locals.
         exe = config.request_execution('/entry/', {})
-        self.assertEqual(exe().path, 'the value')
+        self.assertEqual(exe.execute().path, 'the value')
 
         both_exe = config.request_execution('/entry/both', {})
         # the one provided by kwargs will take precedence.
-        self.assertEqual(both_exe().path, 'the value')
+        self.assertEqual(both_exe.execute().path, 'the value')
 
     def test_resource_kwarg_dict(self):
         # Test that dictionary values passed to resource also resolved.
@@ -742,7 +742,7 @@ class ConfigIntegrationTestCase(unittest.TestCase):
         exe = config.request_execution('/entry/view', {})
         self.assertEqual(exe.locals['thing'].path, {'key': 'the value'})
         # this would have simply access the value like above also
-        self.assertEqual(exe().path, {'key': 'the value'})
+        self.assertEqual(exe.execute().path, {'key': 'the value'})
 
     def test_resource_dot_access_argument(self):
         # Test that dictionary values passed to resource also resolved.
@@ -773,7 +773,7 @@ class ConfigIntegrationTestCase(unittest.TestCase):
         exe = config.request_execution('/entry/view', {})
         self.assertEqual(exe.locals['thing'].path, "the value")
         # this would have simply access the value like above also
-        self.assertEqual(exe().path, "the value")
+        self.assertEqual(exe.execute().path, "the value")
 
     def test_localmap(self):
         # Test out the resource definition that specified a required
@@ -814,8 +814,8 @@ class ConfigIntegrationTestCase(unittest.TestCase):
         """)
 
         exe = config.request_execution('/entry/', {})
-        self.assertEqual(exe().arg1, 'the value')
-        self.assertEqual(exe().arg2, {
+        self.assertEqual(exe.execute().arg1, 'the value')
+        self.assertEqual(exe.execute().arg2, {
             'key1': 'the value',
             'key2': 'the value',
         })

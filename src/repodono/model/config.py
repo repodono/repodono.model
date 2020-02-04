@@ -37,8 +37,8 @@ class BaseConfiguration(BaseMapping):
         super().__init__(config_mapping)
 
     @classmethod
-    def from_toml(cls, config_str):
-        inst = cls(toml.loads(config_str))
+    def from_toml(cls, config_str, **kw):
+        inst = cls(toml.loads(config_str), **kw)
         inst.config_str = config_str
         return inst
 
@@ -56,7 +56,7 @@ class Configuration(BaseConfiguration):
     framework.
     """
 
-    def __init__(self, config_mapping):
+    def __init__(self, config_mapping, execution_class=Execution):
         super().__init__(config_mapping)
         self.environment = Environment(self)
         self.default = Default(self)
@@ -64,6 +64,7 @@ class Configuration(BaseConfiguration):
         self.localmap = Localmap(self)
         self.resource = Resource(self)
         self.endpoint = self.bucket.Endpoint(self)
+        self.execution_class = execution_class
         self.compile()
 
     @property
@@ -117,8 +118,7 @@ class Configuration(BaseConfiguration):
         }
 
     def request_execution(
-            self, route, mapping, bucket_mapping={},
-            execution_class=Execution):
+            self, route, mapping, bucket_mapping={}, execution_class=None):
         """
         Generates an execution object from a route and a mapping that
         may be produced externally to this class.
@@ -137,6 +137,9 @@ class Configuration(BaseConfiguration):
         execution_class
             the class that implements the execution
         """
+
+        if execution_class is None:
+            execution_class = self.execution_class
 
         # resolve the target bucket with the bucket mapping and the
         # bucket config mapping.

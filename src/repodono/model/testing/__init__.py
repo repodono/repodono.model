@@ -16,5 +16,14 @@ class Die(object):
         raise Exception('instantiation of this class is forbidden')
 
 
+class Results(object):
+
+    sample_bytes = b'example'
+    sample_str = 'example'
+    sample_dict = {'1': 'example'}
+    sample_list = ['example']
+    sample_none = None
+
+
 class AttrBaseMapping(BaseMapping, AttributeMapping):
     "Only for this local base test class."

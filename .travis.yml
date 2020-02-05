@@ -1,7 +1,8 @@
-sudo: false
-matrix:
+os: linux
+language: python
+jobs:
   allow_failures:
-    - python: 3.8-dev
+    - python: 3.9-dev
   include:
     - language: python
       python: 3.6
@@ -10,7 +11,7 @@ matrix:
       python: 3.7
     - language: python
       dist: xenial
-      python: 3.8-dev
+      python: 3.8
 
 install:
   - pip install -U pip setuptools coverage flake8

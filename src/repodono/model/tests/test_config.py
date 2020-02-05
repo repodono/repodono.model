@@ -167,18 +167,14 @@ class ConfigBucketTestCase(unittest.TestCase):
         """)
 
         self.assertEqual([
-            '/default', '/generated'
-        ], [
-            str(r) for r in config.bucket['_'].roots
-        ])
+            PurePath('/default'), PurePath('/generated'),
+        ], config.bucket['_'].roots)
         self.assertEqual({'accept': ['*/*']}, config.bucket['_'].environment)
-        self.assertEqual([
-            '/json'], [str(r) for r in config.bucket['json'].roots])
+        self.assertEqual([PurePath('/json')], config.bucket['json'].roots)
         self.assertEqual({
             'accept': ['application/json', 'text/json']
         }, config.bucket['json'].environment)
-        self.assertEqual([
-            '/xml'], [str(r) for r in config.bucket['xml'].roots])
+        self.assertEqual([PurePath('/xml')], config.bucket['xml'].roots)
         self.assertEqual({
             'accept': ['application/xml', 'text/xml']
         }, config.bucket['xml'].environment)

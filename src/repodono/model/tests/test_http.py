@@ -33,7 +33,7 @@ class HttpExecutionTestCase(unittest.TestCase):
         some_result = "A simple text result"
 
         [environment.paths]
-        std_root = "%s"
+        std_root = %r
 
         [bucket._]
         __roots__ = ['std_root']
@@ -61,7 +61,7 @@ class HttpExecutionTestCase(unittest.TestCase):
         __init__ = "repodono.model.testing:Results"
 
         [environment.paths]
-        std_root = "%s"
+        std_root = %r
 
         [bucket._]
         __roots__ = ['std_root']
@@ -107,7 +107,7 @@ class HttpExecutionTestCase(unittest.TestCase):
         __init__ = "repodono.model.testing:Results"
 
         [environment.paths]
-        std_root = "%s"
+        std_root = %r
 
         [bucket._]
         __roots__ = ['std_root']
@@ -130,7 +130,7 @@ class HttpExecutionTestCase(unittest.TestCase):
         __init__ = "repodono.model.testing:Results"
 
         [environment.paths]
-        std_root = "%s"
+        std_root = %r
 
         [bucket._]
         __roots__ = ['std_root']
@@ -156,7 +156,7 @@ class HttpExecutionTestCase(unittest.TestCase):
         __init__ = "repodono.model.testing:Results"
 
         [environment.paths]
-        std_root = "%s"
+        std_root = %r
 
         [bucket._]
         __roots__ = ['std_root']
@@ -183,7 +183,7 @@ class HttpExecutionTestCase(unittest.TestCase):
         content = "default"
 
         [environment.paths]
-        std_root = "%s"
+        std_root = %r
 
         [bucket._]
         __roots__ = ['std_root']

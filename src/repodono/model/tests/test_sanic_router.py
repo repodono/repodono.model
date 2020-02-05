@@ -30,7 +30,13 @@ class SanicRouterTestCase(unittest.TestCase):
         routeuri = templateuri_to_sanic_routeuri(template)
         router.add(routeuri, ['GET'], 'root')
         request = make_request('/root')
-        self.assertEqual(('root', [], {}, routeuri,), router.get(request))
+        self.assertEqual((
+            'root',
+            [], {
+            },
+            routeuri,
+            None,
+        ), router.get(request))
 
     def test_fail_on_partial(self):
         router = Router()
@@ -59,6 +65,7 @@ class SanicRouterTestCase(unittest.TestCase):
                 'path': '/some/test/path',
             },
             routeuri,
+            None,
         ), router.get(request))
 
         request = make_request('/root/base/some/test/path/')
@@ -69,4 +76,5 @@ class SanicRouterTestCase(unittest.TestCase):
                 'path': '/some/test/path/',
             },
             routeuri,
+            None,
         ), router.get(request))

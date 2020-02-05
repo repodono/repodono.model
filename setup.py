@@ -44,7 +44,7 @@ setup(
             'flask',
         ],
         'sanic': [
-            'sanic',
+            'sanic>=19,<20',
         ],
     },
     python_requires='>=3.6',

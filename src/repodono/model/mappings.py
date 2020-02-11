@@ -16,6 +16,10 @@ from repodono.model.base import (
 )
 
 
+# TODO may also consider a Meta construct similar to Environment?
+# This would allow the instantiation of objects that would be available
+# to the running process, but not to the environment from inside it.
+
 class Environment(StructuredMapping((
     ('environment', StructuredMapping((
         ('variables', BaseMapping,),

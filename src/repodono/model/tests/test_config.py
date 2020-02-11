@@ -248,12 +248,20 @@ class ConfigIntegrationTestCase(unittest.TestCase):
 
     def test_base(self):
         config_str = """
+        [config]
+        foo = 'bar'
+        [settings]
+        foo = 'bar'
         [environment.variables]
         foo = 'bar'
         """
 
         config = Configuration.from_toml(config_str)
+        # this test that the raw import works.
         self.assertEqual(config['environment']['variables']['foo'], 'bar')
+        # also that other arbitrary undefined key/values are kept
+        self.assertEqual(config['config']['foo'], 'bar')
+        self.assertEqual(config['settings']['foo'], 'bar')
 
     def test_environment_shadowing(self):
         config_str = """

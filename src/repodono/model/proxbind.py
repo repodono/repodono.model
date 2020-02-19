@@ -65,6 +65,13 @@ class MappingBinderMeta(type):
         # unbounded and bounded instances of the class.
 
         def bind(self, mapping):
+            """
+            Standard binding method.
+
+            A bounded instance of the original to the provided mapping
+            will be returned.
+            """
+
             # self in this case will be the unbounded object
             # inst will be the actual object to be wrapped.
             inst = self.unwrapped
@@ -82,8 +89,46 @@ class MappingBinderMeta(type):
             bounded_inst = bounded_class(inst)
             return bounded_inst
 
+        def mapped_bind(self, mapped_mapping):
+            """
+            A more specific binding method
+
+            The mapped_mapping argument must be an iterable of tuples of
+            2 or 3 elements.  The first must be a name pointing to a
+            defined remapping function on the metaclass, the second is
+            an instance of some mapping; the third, optional item is the
+            name of attribute from the unwrapped instance for the source
+            value, if not provided it defaults to be same as first
+            element.
+            """
+
+            # self in this case will be the unbounded object
+            # inst will be the actual object to be wrapped.
+            inst = self.unwrapped
+            full_kwargs = {}
+            full_kwargs.update(base_kwargs)
+
+            for entry in mapped_mapping:
+                if len(entry) == 2:
+                    attr, mapping = entry
+                    src_attr = attr
+                elif len(entry) == 3:
+                    attr, mapping, src_attr = entry
+                else:
+                    raise ValueError(
+                        "unsupported mapped_mapping entity %r" % (entry,))
+
+                full_kwargs[attr] = partialproperty(
+                    partial(getattr(metaclass, attr), mapping, partial(
+                        getattr, inst, src_attr)))
+
+            bounded_class = type(
+                name, (proxy_base, bounded_base,), full_kwargs)
+            bounded_inst = bounded_class(inst)
+            return bounded_inst
+
         def __getattribute__(self, attr):
-            if attr in ('bind', 'unwrapped'):
+            if attr in ('bind', 'mapped_bind', 'unwrapped',):
                 return object.__getattribute__(self, attr)
             raise AttributeError(
                 "unbounded objects must be bounded with 'bind' to a mapping "
@@ -104,6 +149,7 @@ class MappingBinderMeta(type):
             metaclass, 'Unbounded' + name, (proxy_base,), {
                 'bind': bind,
                 'bounded': bounded_base,
+                'mapped_bind': mapped_bind,
                 'unwrapped': proxy_base(None),
                 '__getattribute__': __getattribute__,
                 '__getattr__': __getattr__,

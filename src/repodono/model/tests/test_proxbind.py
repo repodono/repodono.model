@@ -29,8 +29,9 @@ class ReuseAttr(object):
     special meaning defined by the protocol/metaclass.
     """
 
-    def __init__(self, bind, bounded, unwrapped):
+    def __init__(self, bind, mapped_bind, bounded, unwrapped):
         self.bind = bind
+        self.mapped_bind = mapped_bind
         self.bounded = bounded
         self.unwrapped = unwrapped
 
@@ -42,6 +43,9 @@ class MappedExtThingMeta(MappingBinderMeta):
     fully contains the mapping to a single class and single function for
     each remapped attribute
     """
+
+    def alt_path(mapping, attr_value):
+        return mapping[attr_value]
 
     def path(mapping, attr_value):
         return mapping[attr_value]
@@ -64,6 +68,9 @@ class ReuseAttrMeta(MappingBinderMeta):
 
     def bind(mapping, attr_value):
         return 'bind(%s)' % mapping[attr_value]
+
+    def mapped_bind(mapping, attr_value):
+        return 'mapped_bind(%s)' % mapping[attr_value]
 
     def bounded(mapping, attr_value):
         return 'bounded(%s)' % mapping[attr_value]
@@ -115,6 +122,12 @@ class BindingProtocolTestCase(unittest.TestCase):
             ('/somewhere/foo'),
             ['/somewhere/foo', '/somewhere/bar', '/elsewhere/baz']
         ))
+
+        with self.assertRaises(AttributeError):
+            # accessing metaclass defined attribute without the
+            # corresponding attribute on the original will be an
+            # attribute error.
+            mapped_thing.alt_path
 
         self.assertTrue(isinstance(mapped_thing, MappedExtThing.bounded))
 
@@ -168,12 +181,75 @@ class BindingProtocolTestCase(unittest.TestCase):
             'one': 1,
             'two': 2,
             'three': 3,
+            'four': 4,
         }
-        base_attrs = ReuseAttr(bind='one', bounded='two', unwrapped='three')
+        base_attrs = ReuseAttr(
+            bind='one', bounded='two', unwrapped='three', mapped_bind='four')
         attr_tester = MappedReuseAttr(base_attrs).bind(mapping)
         # prove that classes/objects providing attributes with the same
         # names as names in this metaclass do not conflict in actual
         # usage.
         self.assertEqual(attr_tester.bind, 'bind(1)')
+        self.assertEqual(attr_tester.mapped_bind, 'mapped_bind(4)')
         self.assertEqual(attr_tester.bounded, 'bounded(2)')
         self.assertEqual(attr_tester.unwrapped, 'unwrapped(3)')
+
+
+class MultiBindingProtocolTestCase(unittest.TestCase):
+
+    def test_wrong_number_argument(self):
+        thing = ExtThing('foo', ['foo', 'bar', 'baz'])
+        mapping = {
+            'foo': '/somewhere/foo',
+            'bar': '/somewhere/bar',
+            'baz': '/elsewhere/baz',
+        }
+        with self.assertRaises(ValueError):
+            MappedExtThing(thing).mapped_bind((('path',),))
+
+        with self.assertRaises(ValueError):
+            MappedExtThing(thing).mapped_bind((
+                ('path', mapping, 'path', 'extra'),
+            ))
+
+    def test_basic(self):
+        thing = ExtThing('foo', ['foo', 'bar', 'baz'])
+        mapping_one = {
+            'foo': '/nowhere/foo',
+        }
+        mapping_two = {
+            'foo': '/somewhere/foo',
+            'bar': '/somewhere/bar',
+            'baz': '/elsewhere/baz',
+        }
+
+        mapped_thing = MappedExtThing(thing).mapped_bind((
+            ('path', mapping_one),
+            ('paths', mapping_two),
+            ('alt_path', mapping_two, 'path'),
+        ))
+
+        self.assertEqual(mapped_thing.path, '/nowhere/foo')
+        self.assertEqual(mapped_thing.paths, [
+            '/somewhere/foo', '/somewhere/bar', '/elsewhere/baz'])
+        self.assertEqual(mapped_thing.get_all_targets(), (
+            ('/nowhere/foo'),
+            ['/somewhere/foo', '/somewhere/bar', '/elsewhere/baz']
+        ))
+        # even if alt_path was not in the original, the mapped_bind
+        # provided the method to resolve this attribute.
+        self.assertEqual(mapped_thing.alt_path, '/somewhere/foo')
+
+        self.assertTrue(isinstance(mapped_thing, MappedExtThing.bounded))
+
+        with self.assertRaises(AttributeError):
+            # cannot access attributes of an unbounded mapped thing
+            MappedExtThing(thing).path
+
+        with self.assertRaises(AttributeError):
+            # cannot access attributes of an unbounded mapped thing
+            MappedExtThing(thing).path
+
+        # again, accessing the other permitted unwrapped (original)
+        # instance will not be an issue
+        self.assertIs(MappedExtThing(thing).unwrapped, thing)

@@ -57,6 +57,21 @@ class ConfigEnvironmentTestCase(unittest.TestCase):
         self.assertTrue(isinstance(config.default['thing'].path, Path))
         self.assertEqual(config.default['foo'], 'bar')
 
+    def test_metadata_object(self):
+        root = TemporaryDirectory()
+        self.addCleanup(root.cleanup)
+        config = Configuration.from_toml("""
+        [metadata.variables]
+        foo = "bar"
+        [metadata.paths]
+        base_root = %r
+        [[metadata.objects]]
+        __name__ = "thing"
+        __init__ = "repodono.model.testing:Thing"
+        path = "base_root"
+        """ % (root.name,))
+        self.assertTrue(isinstance(config.metadata['thing'].path, Path))
+
     def test_list_items_resolved(self):
         root = TemporaryDirectory()
         self.addCleanup(root.cleanup)
@@ -1134,10 +1149,15 @@ class ConfigIntegrationTestCase(unittest.TestCase):
         self.addCleanup(std_root.cleanup)
         alt_root = TemporaryDirectory()
         self.addCleanup(alt_root.cleanup)
+        alt_metadata_root = TemporaryDirectory()
+        self.addCleanup(alt_metadata_root.cleanup)
 
         config = Configuration.from_toml("""
         [environment.paths]
         std_root = %r
+        alt_root = %r
+
+        [metadata.paths]
         alt_root = %r
 
         [bucket._]
@@ -1160,7 +1180,7 @@ class ConfigIntegrationTestCase(unittest.TestCase):
         [endpoint."alt"."/post/"]
         __provider__ = "mock"
         __root__ = "std_root"
-        """ % (std_root.name, alt_root.name))
+        """ % (std_root.name, alt_root.name, alt_metadata_root.name,))
 
         std_entry = config.request_execution(
             '/entry/view', {}, {'accept': 'text/plain'})
@@ -1184,9 +1204,26 @@ class ConfigIntegrationTestCase(unittest.TestCase):
             PurePath(alt_root.name) / 'entry' / 'view'
         )
 
+        self.assertEqual(
+            str(alt_entry.locals['__metadata_root__']), alt_metadata_root.name,
+            'not equal to alt_metadata_root.name',
+        )
+        self.assertEqual(
+            alt_entry.locals['__metadata_path__'],
+            PurePath(alt_metadata_root.name) / 'entry' / 'view'
+        )
+
         alt_post = config.request_execution(
             '/post/', {}, {'accept': 'application/x-alt'})
         self.assertEqual(
             str(alt_post.locals['__root__']), std_root.name,
             'not equal to std_root.name',
         )
+
+        # tentatively this happens when the std_root has no
+        # corresponding metadata.paths defined.
+        with self.assertRaises(KeyError):
+            alt_post.locals['__metadata_root__']
+
+        with self.assertRaises(KeyError):
+            alt_post.locals['__metadata_path__']

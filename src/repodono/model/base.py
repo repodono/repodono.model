@@ -825,6 +825,13 @@ class BaseEndpointDefinitionMeta(MappingBinderMeta):
                 "'%s' must be declared under environment.paths" % attr_value)
         return result
 
+    def metadata_root(mapping, attr_value):
+        result = mapping.get(attr_value)
+        if not isinstance(result, Path):
+            raise TypeError(
+                "'%s' must be declared under metadata.paths" % attr_value)
+        return result
+
 
 class BoundedEndpointDefinition(
         BaseEndpointDefinition, metaclass=BaseEndpointDefinitionMeta):
@@ -832,7 +839,7 @@ class BoundedEndpointDefinition(
     The singular bounded endpoint definition
     """
 
-    def build_cache_path(self, mapping):
+    def build_cache_path(self, mapping, root_attr='root'):
         """
         For a bounded endpoint definition, it becomes possible to locate
         the actual path where the referenced resource on the filesystem.
@@ -844,7 +851,7 @@ class BoundedEndpointDefinition(
         """
 
         # TODO if root might be NotImplemented?
-        # if not self.root:
+        # if not getattr(self, root_attr):
         #     return None
 
         fragments = self.route_uritemplate.expand(**mapping).split('/')
@@ -856,7 +863,8 @@ class BoundedEndpointDefinition(
 
         if self.route.endswith('/'):
             if self.filename:
-                return self.root.joinpath(*fragments) / self.filename
+                return getattr(self, root_attr).joinpath(
+                    *fragments) / self.filename
             else:
                 logger.info(
                     "route '%s' ends with '/' but no filename provided for "
@@ -865,7 +873,7 @@ class BoundedEndpointDefinition(
                 )
                 return None
 
-        return self.root.joinpath(*fragments)
+        return getattr(self, root_attr).joinpath(*fragments)
 
 
 class BaseEndpointDefinitionMapping(BasePreparedMapping):
@@ -1291,9 +1299,12 @@ class Execution(object):
             a mapping representing the primary mapping of environment
             values in the runtime environment
         default
-            a mapping representing the default mapping of values in
-            the runtime environment to be provided as a last resort
-            default value.
+            a mapping representing the default mapping of values in the
+            runtime environment to be provided as a last resort default
+            value.
+        metadata
+            a mapping representing the mapping of metadata values for
+            the runtime environment
         resources
             the mapping of resources available resolved for the current
             endpoint.
@@ -1308,20 +1319,28 @@ class Execution(object):
         self.default = default
         self.resources = resources
         self.endpoint_mapping = endpoint_mapping
+        # TODO figure out further reserved bindings and formalise
+        # the system for this.
+        # TODO make reserved mapping lazy.
+        reserved = {
+            # Also ensure the "dynamic" locally bounded version is
+            # also available.
+            '__route__': endpoint.route,
+            '__root__': endpoint.root,
+            # XXX TODO provide a path of some kind associated with
+            # this resource from endpoint, e.g. join with __root__
+            # '__path__': endpoint.route,
+            '__path__': endpoint.build_cache_path(endpoint_mapping),
+        }
+        try:
+            reserved['__metadata_root__'] = endpoint.metadata_root
+            reserved['__metadata_path__'] = endpoint.build_cache_path(
+                endpoint_mapping, 'metadata_root')
+        except TypeError:
+            pass
+
         self.locals = EndpointExecutionLocals([
-            # TODO figure out further reserved bindings and formalise
-            # the system for this.
-            # TODO make this first mapping lazy
-            {
-                # Also ensure the "dynamic" locally bounded version is
-                # also available.
-                '__route__': endpoint.route,
-                '__root__': endpoint.root,
-                # XXX TODO provide a path of some kind associated with
-                # this resource from endpoint, e.g. join with __root__
-                # '__path__': endpoint.route,
-                '__path__': endpoint.build_cache_path(endpoint_mapping),
-            },
+            reserved,
             environment,
             endpoint.environment,
             resources,

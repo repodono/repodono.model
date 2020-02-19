@@ -16,10 +16,6 @@ from repodono.model.base import (
 )
 
 
-# TODO may also consider a Meta construct similar to Environment?
-# This would allow the instantiation of objects that would be available
-# to the running process, but not to the environment from inside it.
-
 class Environment(StructuredMapping((
     ('environment', StructuredMapping((
         ('variables', BaseMapping,),
@@ -65,6 +61,29 @@ class Default(StructuredMapping((
     [[Default.default]]
     paths = "repodono.model.base:PathMapping"
     [[Default.default]]
+    objects = "repodono.model.base:ObjectInstantiationMapping"
+    """
+
+
+class Metadata(StructuredMapping((
+    ('metadata', StructuredMapping((
+        ('variables', BaseMapping,),
+        ('paths', PathMapping,),
+        ('objects', ObjectInstantiationMapping,),
+    ),),),
+))):
+    """
+    Default metadata implementation - based on the environment, given
+    that there are some use-cases where a relevant counterpart for a
+    given key-value will be required depending on the run time
+    requirements.
+
+    [[Metadata]]
+    [[Metadata.metadata]]
+    variables = "repodono.model.base:BaseMapping"
+    [[Metadata.metadata]]
+    paths = "repodono.model.base:PathMapping"
+    [[Metadata.metadata]]
     objects = "repodono.model.base:ObjectInstantiationMapping"
     """
 

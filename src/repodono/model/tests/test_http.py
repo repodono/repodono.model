@@ -1,4 +1,6 @@
 import unittest
+from os.path import exists
+from pathlib import Path
 from tempfile import TemporaryDirectory
 
 from repodono.model.http import Response, HttpExecution
@@ -6,6 +8,18 @@ from repodono.model.config import Configuration
 
 
 class ResponseTestCase(unittest.TestCase):
+
+    def mk_exec_locals(self):
+        root = TemporaryDirectory()
+        self.addCleanup(root.cleanup)
+        root_path = Path(root.name)
+        # just creating "enough" of the execution object
+        execution = HttpExecution.__new__(HttpExecution)
+        execution.locals = {
+            '__path__': root_path / 'path' / 'file.txt',
+            '__metadata_path__': root_path / 'metadata' / 'file.txt',
+        }
+        return execution
 
     def test_response_base(self):
         response = Response('text')
@@ -20,6 +34,44 @@ class ResponseTestCase(unittest.TestCase):
         self.assertEqual(response.headers, {
             'content-length': '4',
         })
+
+    def test_store_to_disk_success_roundtrip(self):
+        execution = self.mk_exec_locals()
+        self.assertFalse(exists(execution.locals['__path__']))
+        self.assertFalse(exists(execution.locals['__metadata_path__']))
+        response = Response('hello world', headers={
+            'content-type': 'text/plain',
+        })
+        response.store_to_disk(execution)
+        self.assertTrue(exists(execution.locals['__path__']))
+        self.assertTrue(exists(execution.locals['__metadata_path__']))
+
+        new_response = Response.restore_from_disk(execution)
+        self.assertEqual(new_response.content, response.content)
+        self.assertEqual(new_response.headers, response.headers)
+
+    def test_store_to_disk_fail_missing_keys(self):
+        execution = self.mk_exec_locals()
+        # remove a required key
+        execution.locals.pop('__metadata_path__')
+        response = Response('hello world', headers={
+            'content-type': 'text/plain',
+        })
+        with self.assertRaises(ValueError):
+            response.store_to_disk(execution)
+        self.assertFalse(exists(execution.locals['__path__']))
+
+    def test_store_to_disk_fail_cannot_create_dir(self):
+        execution = self.mk_exec_locals()
+        # prevent directory creation with an empty file
+        execution.locals['__path__'].parent.write_bytes(b'')
+        response = Response('hello world', headers={
+            'content-type': 'text/plain',
+        })
+        with self.assertRaises(ValueError):
+            response.store_to_disk(execution)
+        self.assertFalse(exists(execution.locals['__path__']))
+        self.assertFalse(exists(execution.locals['__metadata_path__']))
 
 
 class HttpExecutionTestCase(unittest.TestCase):

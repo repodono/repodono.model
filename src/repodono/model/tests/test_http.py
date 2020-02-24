@@ -9,16 +9,16 @@ class ResponseTestCase(unittest.TestCase):
 
     def test_response_base(self):
         response = Response('text')
-        self.assertEqual(response.content, 'text')
+        self.assertEqual(response.content, b'text')
         self.assertEqual(response.headers, {})
 
     def test_response_headers(self):
         response = Response('text', headers={
-            'Content-length': '4',
+            'content-length': '4',
         })
-        self.assertEqual(response.content, 'text')
+        self.assertEqual(response.content, b'text')
         self.assertEqual(response.headers, {
-            'Content-length': '4',
+            'content-length': '4',
         })
 
 
@@ -46,7 +46,7 @@ class HttpExecutionTestCase(unittest.TestCase):
         exe = config.request_execution('/', {}, execution_class=HttpExecution)
         # Invoking execute object directly
         response = exe()
-        self.assertEqual('A simple text result', response.content)
+        self.assertEqual(b'A simple text result', response.content)
         self.assertEqual({
             'content-type': 'text/plain',
         }, response.headers)
@@ -141,7 +141,7 @@ class HttpExecutionTestCase(unittest.TestCase):
         """ % (std_root.name,), execution_class=HttpExecution)
 
         response = config.request_execution('/json', {})()
-        self.assertEqual('{"1": "example"}', response.content)
+        self.assertEqual(b'{"1": "example"}', response.content)
         self.assertEqual({
             'content-type': 'application/json'
         }, response.headers)
@@ -194,5 +194,5 @@ class HttpExecutionTestCase(unittest.TestCase):
         """ % (std_root.name,), execution_class=HttpExecution)
 
         response = config.request_execution('/constructed', {})()
-        self.assertEqual('hello', response.content)
+        self.assertEqual(b'hello', response.content)
         self.assertEqual({}, response.headers)

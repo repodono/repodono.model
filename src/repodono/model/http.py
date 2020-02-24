@@ -13,7 +13,19 @@ class Response(object):
 
     def __init__(self, content, headers=None):
         self.content = content
+        # TODO ensure headers have case-insensitive keys to match HTTP
         self.headers = {} if headers is None else headers
+
+    @property
+    def content(self):
+        return vars(self)['content']
+
+    @content.setter
+    def content(self, value):
+        if isinstance(value, bytes):
+            vars(self)['content'] = value
+        else:
+            vars(self)['content'] = bytes(value, encoding='utf8')
 
 
 class HttpExecution(Execution):

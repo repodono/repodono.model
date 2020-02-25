@@ -73,6 +73,21 @@ class ResponseTestCase(unittest.TestCase):
         self.assertFalse(exists(execution.locals['__path__']))
         self.assertFalse(exists(execution.locals['__metadata_path__']))
 
+    def test_restore_from_disk_failure(self):
+        execution = self.mk_exec_locals()
+
+        execution.locals['__path__'].parent.mkdir()
+        execution.locals['__path__'].write_bytes(b'hi')
+        with self.assertRaises(FileNotFoundError):
+            Response.restore_from_disk(execution)
+        execution.locals['__path__'].unlink()
+
+        execution.locals['__metadata_path__'].parent.mkdir()
+        execution.locals['__metadata_path__'].write_bytes(b'hi')
+        with self.assertRaises(FileNotFoundError):
+            Response.restore_from_disk(execution)
+        execution.locals['__metadata_path__'].unlink()
+
 
 class HttpExecutionTestCase(unittest.TestCase):
 

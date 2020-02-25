@@ -1,19 +1,29 @@
 import json
+import logging
 from mimetypes import MimeTypes
 
 from repodono.model.base import Execution
 
 mimetypes = MimeTypes()
+logger = logging.getLogger(__name__)
 
 
 def check_path(mapping, key):
     result = mapping[key]
+    parent = result.parent
     try:
-        result.parent.mkdir(parents=True, exist_ok=True)
+        parent.mkdir(parents=True, exist_ok=True)
+        # logger.debug("created dir '%s'", parent)
     except OSError as e:
         raise ValueError(
             "failed to create '%s' in execution.locals: %s" % (result, e))
     return result
+
+
+def checked_write_bytes(mapping, key, payload):
+    path = check_path(mapping, key)
+    path.write_bytes(payload)
+    logger.debug("wrote %d bytes to '%s'", len(payload), path)
 
 
 class Response(object):
@@ -55,10 +65,9 @@ class Response(object):
 
     def store_to_disk(self, execution):
         self.validate_execution_locals(execution)
-        check_path(execution.locals, '__path__').write_bytes(
-            self.content)
-        check_path(execution.locals, '__metadata_path__').write_text(
-            json.dumps(self.headers), encoding='utf8')
+        checked_write_bytes(execution.locals, '__path__', self.content)
+        headers = bytes(json.dumps(self.headers), encoding='utf8')
+        checked_write_bytes(execution.locals, '__metadata_path__', headers)
 
 
 class HttpExecution(Execution):

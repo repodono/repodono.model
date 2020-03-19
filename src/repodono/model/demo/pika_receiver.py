@@ -62,7 +62,8 @@ def create_connection_channel(config):
 
         channel.basic_publish(
             exchange=exchange, routing_key=status,
-            body=str(execution.locals['__path__'])),
+            body=str(execution.locals['__path__']),
+        )
         channel.basic_ack(delivery_tag=method.delivery_tag)
 
     def start():
@@ -79,6 +80,7 @@ if __name__ == '__main__':
     import sys
     import logging
     from repodono.model.config import Configuration
+    from repodono.model.http import HttpExecution
 
     if len(sys.argv) < 2:
         sys.stderr.write('usage: %s <config.toml>\n' % sys.argv[0])
@@ -92,7 +94,8 @@ if __name__ == '__main__':
     logger.setLevel(logging.DEBUG)
 
     with open(sys.argv[1]) as fd:
-        config = Configuration.from_toml(fd.read())
+        config = Configuration.from_toml(
+            fd.read(), execution_class=HttpExecution)
     connection, channel, start = create_connection_channel(config)
     try:
         print('listener started...')

@@ -6,6 +6,7 @@ messages to generate output at the specific location.
 """
 
 import pika
+from pathlib import Path
 
 
 def create_connection_channel(config):
@@ -29,42 +30,71 @@ def create_connection_channel(config):
     q_name = channel.queue_declare(queue='', exclusive=True).method.queue
     channel.queue_bind(exchange=exchange, queue=q_name, routing_key=status)
 
-    def status_callback(ch, method, properties, body):
-        print("status: [%r] %r" % (method.routing_key, body,))
+    def sender(body, exe):
+        # TODO figure out how to gracefully check existance of file.
 
-    channel.basic_consume(
-        queue=q_name, on_message_callback=status_callback, auto_ack=True)
-
-    # TODO
-    # modification of RPC - have a channel that is common that broadcast
-    # newly created resources, and the handler will stop listening when
-    # received the appropriate message, and return the thing.
-    def sender(body):
         print("sending %r" % body)
         channel.basic_publish(exchange='', routing_key=queue, body=body)
 
-        # now await response
-        # connection.process_data_events()
-
-        # XXX
-        try:
-            channel.start_consuming()
-        except KeyboardInterrupt:
-            pass
+        # consume the return queue until the expected response
+        for method, properties, body in channel.consume(
+                queue=q_name, auto_ack=True):
+            print("received: [%r] %r" % (method.routing_key, body,))
+            if str(body, encoding='utf8') == str(exe.locals['__path__']):
+                # XXX this duplicates the initial response loading...
+                channel.stop_consuming()
+                response = Response.restore_from_disk(exe)
+                print("response has length %d" % len(response.content))
 
         connection.close()
 
     return connection, channel, sender
 
 
+def path_to_exe_payload(config, path):
+    routed = config.router(path)
+    if routed is None:
+        sys.stderr.write('path unroutable with config\n')
+        sys.exit(1)
+    route, mapping = routed
+    bucket_mapping = {"Accept": "text/html"}
+    payload_dict = {
+        "route": route,
+        "mapping": mapping,
+        "bucket_mapping": bucket_mapping,
+    }
+    exe = config.request_execution(**payload_dict)
+    return exe, json.dumps(payload_dict)
+
+
 if __name__ == '__main__':
     import sys
+    import json
     from repodono.model.config import Configuration
+    from repodono.model.http import Response
+
     if len(sys.argv) < 3:
-        sys.stderr.write('usage: %s <config.toml> <msg_json>\n' % sys.argv[0])
+        sys.stderr.write('usage: %s <config.toml> [-f] <path>\n' % sys.argv[0])
+        sys.stderr.write('\n')
+        sys.stderr.write('  -f to force a message (ignores cache)\n')
         sys.exit(1)
 
     with open(sys.argv[1]) as fd:
         config = Configuration.from_toml(fd.read())
+
+    flush = '-f' in sys.argv
+    path = sys.argv[-1]
+    exe, payload = path_to_exe_payload(config, path)
+
+    if not flush:
+        try:
+            response = Response.restore_from_disk(exe)
+        except OSError:
+            # can't do this
+            pass
+        else:
+            print("Cached response has length %d" % len(response.content))
+            sys.exit(0)
+
     connection, channel, sender = create_connection_channel(config)
-    sender(sys.argv[2])
+    sender(payload, exe)

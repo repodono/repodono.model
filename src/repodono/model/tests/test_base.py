@@ -1241,6 +1241,7 @@ class EndpointDefinitionMappingTestCase(unittest.TestCase):
         # for the mean time, this would be unspecified.
         self.assertIsNone(definition.root)
         self.assertEqual(definition.kwargs_mapping, {})
+        self.assertEqual(definition.not_none, [])
         self.assertEqual(definition.route, '/some/path/{id}')
         self.assertEqual(
             '/some/path/{id}/details',
@@ -1252,6 +1253,7 @@ class EndpointDefinitionMappingTestCase(unittest.TestCase):
             '/some/path/{id}': {
                 '__provider__': 'some_provider',
                 '__root__': 'some_root',
+                '__notnone__': ['some_root'],
                 '__kwargs__': {
                     'local_key', 'execution_key',
                 },
@@ -1267,6 +1269,7 @@ class EndpointDefinitionMappingTestCase(unittest.TestCase):
         self.assertTrue(isinstance(definition.provider, attrgetter))
         self.assertIs(definition.provider(demo), provider)
         self.assertEqual(definition.root, 'some_root')
+        self.assertEqual(definition.not_none, ['some_root'])
         self.assertEqual(definition.kwargs_mapping, {
             'local_key', 'execution_key',
         })

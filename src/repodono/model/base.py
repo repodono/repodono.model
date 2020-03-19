@@ -744,7 +744,7 @@ class BaseEndpointDefinition(object):
 
     def __init__(self, route, bucket_name, provider, root,
                  kwargs_mapping, environment,
-                 filename=None, bucket_mapping=None):
+                 not_none=None, filename=None, bucket_mapping=None):
         """
         Arguments:
 
@@ -779,6 +779,11 @@ class BaseEndpointDefinition(object):
 
         Optional Arguments:
 
+        not_none
+            A list of keys that must not have a None value; this
+            provides a more direct way to show that a value must be
+            present for processing.
+
         filename
             The name of the associated file, if and only if the provided
             route ends with '/'.
@@ -807,6 +812,7 @@ class BaseEndpointDefinition(object):
             self.root = root
         self.kwargs_mapping = kwargs_mapping
         self.environment = environment
+        self.not_none = not_none or []
         self.filename = filename
 
     def build_cache_path(self, mapping):
@@ -934,9 +940,10 @@ class BaseEndpointDefinitionMapping(BasePreparedMapping):
     @classmethod
     def create_endpoint_definition(
             cls, route, bucket_name, provider, root, kwargs_mapping,
-            environment, filename=None, bucket_mapping=None):
+            environment, not_none=None, filename=None, bucket_mapping=None):
         return cls.EndpointDefinition(
             route, bucket_name, provider, root, kwargs_mapping, environment,
+            not_none=not_none,
             filename=filename,
             bucket_mapping=bucket_mapping
         )
@@ -952,6 +959,7 @@ class BaseEndpointDefinitionMapping(BasePreparedMapping):
         # TODO look into defaulting to NotImplemented
         root = environment.pop('__root__', None)
         filename = environment.pop('__filename__', None)
+        not_none = environment.pop('__notnone__', None)
         route = key
 
         if not provider:
@@ -960,6 +968,7 @@ class BaseEndpointDefinitionMapping(BasePreparedMapping):
         return self.create_endpoint_definition(
             route, self.bucket_name, provider, root,
             kwargs_mapping, environment,
+            not_none=not_none,
             filename=filename, bucket_mapping=self.bucket_mapping,
         )
 

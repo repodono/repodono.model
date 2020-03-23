@@ -1227,3 +1227,48 @@ class ConfigIntegrationTestCase(unittest.TestCase):
 
         with self.assertRaises(KeyError):
             alt_post.locals['__metadata_path__']
+
+    def test_endpoint_not_none(self):
+        # Test that dictionary values passed to resource also resolved.
+        config = Configuration.from_toml("""
+        [environment.variables]
+        some_name = "Person"
+        some_value = "Value"
+
+        [[environment.objects]]
+        __name__ = "a_mapping"
+        __init__ = "repodono.model.base:BaseMapping"
+        some_name = "some_name"
+        some_value = "some_value"
+
+        [environment.paths]
+        somewhere = "/"
+
+        [bucket._]
+        __roots__ = ['somewhere']
+
+        [[resource."/get/{key}"]]
+        __name__ = "a_mapping_get"
+        __call__ = "a_mapping.get"
+        key = "key"
+
+        [endpoint._."/get/{key}"]
+        __provider__ = "a_mapping_get"
+        __notnone__ = ["a_mapping_get"]
+        """)
+
+        # verify that the base case works
+        exe = config.request_execution('/get/{key}', {'key': 'some_name'})
+        self.assertEqual(exe.locals['a_mapping_get'], 'Person')
+        self.assertEqual(exe(), 'Person')
+
+        exe = config.request_execution('/get/{key}', {'key': 'nothing'})
+        self.assertEqual(exe.locals['a_mapping_get'], None)
+        with self.assertRaises(KeyError) as e:
+            exe()
+
+        self.assertEqual(
+            e.exception.args[0],
+            "'a_mapping_get' unexpectedly resolved to None for end point "
+            "in bucket '_' with route '/get/{key}'"
+        )

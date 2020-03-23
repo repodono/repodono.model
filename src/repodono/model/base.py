@@ -1362,6 +1362,14 @@ class Execution(object):
         Executes the instructions encoded in the endpoint object.
         """
 
+        for key in self.endpoint.not_none:
+            if self.locals[key] is None:
+                # TODO should include the name of the endpoint set
+                raise KeyError(
+                    "'%s' unexpectedly resolved to None for end point "
+                    "in bucket '%s' with route '%s'" % (
+                        key, self.endpoint.bucket_name, self.endpoint.route)
+                )
         return self.endpoint.provider(self.locals)
 
     def __call__(self):

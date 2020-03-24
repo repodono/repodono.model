@@ -85,10 +85,8 @@ class HttpExecution(Execution):
         """
 
         result = self.execute()
-        if result is None:
-            return None
 
-        elif isinstance(result, Response):
+        if isinstance(result, Response):
             # It may be possible for results be already wrapped, so in
             # this instance return it as is.
             return result

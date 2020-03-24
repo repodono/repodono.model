@@ -15,6 +15,7 @@ from collections import (
 from pkg_resources import EntryPoint
 from uritemplate import URITemplate
 
+from repodono.model.exceptions import ExecutionNoResultError
 from repodono.model.proxbind import MappingBinderMeta
 
 logger = getLogger(__name__)
@@ -1365,12 +1366,21 @@ class Execution(object):
         for key in self.endpoint.not_none:
             if self.locals[key] is None:
                 # TODO should include the name of the endpoint set
-                raise KeyError(
+                raise ExecutionNoResultError(
                     "'%s' unexpectedly resolved to None for end point "
                     "in bucket '%s' with route '%s'" % (
                         key, self.endpoint.bucket_name, self.endpoint.route)
                 )
-        return self.endpoint.provider(self.locals)
+        result = self.endpoint.provider(self.locals)
+        if result is None:
+            raise ExecutionNoResultError(
+                "provider '%s' referenced by end point in bucket '%s' "
+                "with route '%s' produced no results" % (
+                    self.endpoint.name, self.endpoint.bucket_name,
+                    self.endpoint.route
+                )
+            )
+        return result
 
     def __call__(self):
         """

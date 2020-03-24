@@ -2,6 +2,7 @@ import unittest
 from pathlib import Path, PurePath
 from tempfile import TemporaryDirectory
 
+from repodono.model.exceptions import ExecutionNoResultError
 from repodono.model.config import Configuration
 
 
@@ -1264,7 +1265,7 @@ class ConfigIntegrationTestCase(unittest.TestCase):
 
         exe = config.request_execution('/get/{key}', {'key': 'nothing'})
         self.assertEqual(exe.locals['a_mapping_get'], None)
-        with self.assertRaises(KeyError) as e:
+        with self.assertRaises(ExecutionNoResultError) as e:
             exe()
 
         self.assertEqual(

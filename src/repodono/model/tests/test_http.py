@@ -5,6 +5,7 @@ from tempfile import TemporaryDirectory
 
 from repodono.model.http import Response, HttpExecution
 from repodono.model.config import Configuration
+from repodono.model.exceptions import ExecutionNoResultError
 
 
 class ResponseTestCase(unittest.TestCase):
@@ -184,8 +185,14 @@ class HttpExecutionTestCase(unittest.TestCase):
         __provider__ = "results.sample_none"
         """ % (std_root.name,), execution_class=HttpExecution)
 
-        response = config.request_execution('/nothing', {})()
-        self.assertIsNone(response)
+        with self.assertRaises(ExecutionNoResultError) as e:
+            config.request_execution('/nothing', {})()
+
+        self.assertEqual(
+            e.exception.args[0],
+            "provider 'results.sample_none' referenced by end point "
+            "in bucket '_' with route '/nothing' produced no results"
+        )
 
     def test_execution_json(self):
         std_root = TemporaryDirectory()

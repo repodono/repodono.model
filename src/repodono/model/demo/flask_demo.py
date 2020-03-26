@@ -12,6 +12,7 @@ from flask import (
 )
 
 from repodono.model.urimatch_flask import URITemplateRule
+from repodono.model.exceptions import ExecutionNoResultError
 
 
 def configure_app(app, config):
@@ -25,9 +26,10 @@ def configure_app(app, config):
         # }))
         execution = config.request_execution(
             request.endpoint, kwargs, request.headers)
-        result = execution()
-        if not result:
-            # should use better heuristics to figure this out.
+
+        try:
+            result = execution()
+        except ExecutionNoResultError:
             abort(404)
 
         return Response(

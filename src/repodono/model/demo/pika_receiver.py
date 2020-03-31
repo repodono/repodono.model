@@ -5,15 +5,31 @@ This demonstrates how a minimum task runner may be implemented to accept
 messages to generate output at the specific location.
 """
 
-import pika
 import json
+import logging
 import traceback
+
+import pika
+
+from time import time
+from repodono.model.exceptions import ExecutionNoResultError
+
+logger = logging.getLogger(__name__)
+
+
+def build_receipt(success=False, path=None):
+    result = {
+        'success': success,
+    }
+    if path:
+        result['path'] = path
+    return json.dumps(result)
 
 
 def create_connection_channel(config):
     settings = config.get('settings', {})
 
-    pika_settings = config.get('pika_settings', {})
+    pika_settings = settings.get('pika', {})
     host = pika_settings.get('host', 'localhost')
     exchange = pika_settings.get('exchange', 'repodono')
     queue = pika_settings.get('queue', 'repodono.task')
@@ -28,43 +44,63 @@ def create_connection_channel(config):
     # exchange for the status
     channel.exchange_declare(exchange=exchange, exchange_type='topic')
 
+    def reject(delivery_tag, **kw):
+        channel.basic_publish(
+            exchange=exchange, routing_key=status,
+            body=build_receipt(False, **kw)
+        )
+        channel.basic_reject(
+            delivery_tag=delivery_tag, requeue=False)
+        return False
+
+    def ack(delivery_tag, **kw):
+        channel.basic_publish(
+            exchange=exchange, routing_key=status,
+            body=build_receipt(True, **kw)
+        )
+        channel.basic_ack(delivery_tag=delivery_tag)
+        return True
+
     def callback(ch, method, properties, body):
-        print("Received %r" % body)
+        logger.debug("received %r" % body)
+        start_time = time()
         try:
             decoded = json.loads(body)
         except ValueError:
-            print("Error: received invalid JSON")
-            channel.basic_reject(
-                delivery_tag=method.delivery_tag, requeue=False)
-            return False
+            logger.info("received invalid json")
+            return reject(method.delivery_tag)
 
-        # endpoint, kwargs, headers
         try:
+            # endpoint, kwargs, headers
             execution = config.request_execution(**decoded)
-            result = execution()
+            path = str(execution.locals['__path__'])
         except Exception as e:
-            print("Failed execution")
+            logger.info("failed to request execution")
             traceback.print_exc()
             # reject execution failures for now.
-            channel.basic_reject(
-                delivery_tag=method.delivery_tag, requeue=False)
-            return False
+            return reject(method.delivery_tag)
+
+        try:
+            result = execution()
+        except ExecutionNoResultError:
+            logger.debug("execution with received json produced no results")
+            logger.debug("finished entire task in %0.3fms", (
+                time() - start_time) * 1000)
+            return reject(method.delivery_tag, path=path)
+        except Exception as e:
+            logger.exception("failed execution")
+            # reject execution failures for now; alternatively option is
+            # to requeue this somehow?
+            return reject(method.delivery_tag, path=path)
 
         try:
             result.store_to_disk(execution)
+            logger.debug("finished entire task in %0.3fms", (
+                time() - start_time) * 1000)
         except ValueError:
-            print("Failed to serialise")
-            traceback.print_exc()
-            # reject execution failures for now.
-            channel.basic_reject(
-                delivery_tag=method.delivery_tag, requeue=False)
-            return False
-
-        channel.basic_publish(
-            exchange=exchange, routing_key=status,
-            body=str(execution.locals['__path__']),
-        )
-        channel.basic_ack(delivery_tag=method.delivery_tag)
+            logger.exception("failed to serialise")
+            return reject(method.delivery_tag, path=path)
+        return ack(method.delivery_tag, path=path)
 
     def start():
         channel.basic_consume(
@@ -78,7 +114,6 @@ def create_connection_channel(config):
 
 if __name__ == '__main__':
     import sys
-    import logging
     from repodono.model.config import Configuration
     from repodono.model.http import HttpExecution
 

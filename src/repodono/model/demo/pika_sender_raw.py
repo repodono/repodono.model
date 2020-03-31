@@ -5,12 +5,15 @@ This demonstrates how a minimum task runner may be implemented to accept
 messages to generate output at the specific location.
 """
 
+import logging
 import pika
+
+logger = logging.getLogger(__name__)
 
 
 def create_connection_channel(config):
     settings = config.get('settings', {})
-    pika_settings = config.get('pika_settings', {})
+    pika_settings = settings.get('pika', {})
     host = pika_settings.get('host', 'localhost')
     exchange = pika_settings.get('exchange', 'repodono')
     queue = pika_settings.get('queue', 'repodono.task')
@@ -25,7 +28,7 @@ def create_connection_channel(config):
     # newly created resources, and the handler will stop listening when
     # received the appropriate message, and return the thing.
     def sender(body):
-        print("sending %r" % body)
+        logger.info("sending %r" % body)
         channel.basic_publish(exchange='', routing_key=queue, body=body)
         connection.close()
 

@@ -1344,10 +1344,14 @@ class Execution(object):
         }
         try:
             reserved['__metadata_root__'] = endpoint.metadata_root
+        except TypeError as e:
+            logger.info(
+                "endpoint at bucket '%s' with route '%s' may fail: %s",
+                endpoint.bucket_name, endpoint.route, e
+            )
+        else:
             reserved['__metadata_path__'] = endpoint.build_cache_path(
                 endpoint_mapping, 'metadata_root')
-        except TypeError:
-            pass
 
         self.locals = EndpointExecutionLocals([
             reserved,

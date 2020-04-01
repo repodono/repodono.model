@@ -43,6 +43,10 @@ class Response(object):
         for key in ['__path__', '__metadata_path__']:
             if key not in execution.locals:
                 raise ValueError("execution.locals did not provide '%s'" % key)
+            if not isinstance(execution.locals[key], Path):
+                raise TypeError(
+                    "execution.locals['%s'] resolved to %r, which is not an "
+                    "instance of Path" % (key, execution.locals[key]))
         return True
 
     @classmethod

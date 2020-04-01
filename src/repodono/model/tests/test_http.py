@@ -62,6 +62,17 @@ class ResponseTestCase(unittest.TestCase):
             response.store_to_disk(execution)
         self.assertFalse(exists(execution.locals['__path__']))
 
+    def test_store_to_disk_fail_invalid_type(self):
+        execution = self.mk_exec_locals()
+        # remove a required key
+        execution.locals['__metadata_path__'] = None
+        response = Response('hello world', headers={
+            'content-type': 'text/plain',
+        })
+        with self.assertRaises(TypeError):
+            response.store_to_disk(execution)
+        self.assertFalse(exists(execution.locals['__path__']))
+
     def test_store_to_disk_fail_cannot_create_dir(self):
         execution = self.mk_exec_locals()
         # prevent directory creation with an empty file

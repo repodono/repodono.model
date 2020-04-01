@@ -17,13 +17,6 @@ from repodono.model.exceptions import ExecutionNoResultError
 
 def configure_app(app, config):
     def endpoint(**kwargs):
-        # To produce a message for the pika sender
-        # import json
-        # print(json.dumps({
-        #     "route": request.endpoint,
-        #     "mapping": kwargs,
-        #     "bucket_mapping": dict(request.headers),
-        # }))
         execution = config.request_execution(
             request.endpoint, kwargs, request.headers)
 
@@ -33,7 +26,7 @@ def configure_app(app, config):
             abort(404)
 
         return Response(
-            result.content, mimetype=result.headers['Content-type'])
+            result.content, mimetype=result.headers['content-type'])
         # should really do this
         # abort(500)
         return result

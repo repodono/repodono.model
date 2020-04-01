@@ -97,7 +97,7 @@ def create_connection_channel(config):
             result.store_to_disk(execution)
             logger.debug("finished entire task in %0.3fms", (
                 time() - start_time) * 1000)
-        except ValueError:
+        except (ValueError, TypeError):
             logger.exception("failed to serialise")
             return reject(method.delivery_tag, path=path)
         return ack(method.delivery_tag, path=path)
@@ -137,4 +137,3 @@ if __name__ == '__main__':
         start()
     except KeyboardInterrupt:
         print('quitting.')
-

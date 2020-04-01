@@ -11,6 +11,8 @@ import pika
 from pathlib import Path
 from time import time
 
+from repodono.model.http import Response
+
 logger = logging.getLogger()
 
 
@@ -50,6 +52,7 @@ def create_connection_channel(config):
             if method is None:
                 logger.warning(
                     "no response received after %s second(s)" % timeout)
+                # TODO some kind of timeout error
                 break
             logger.debug("received: [%r] %r" % (method.routing_key, body,))
             payload = json.loads(body)
@@ -58,8 +61,6 @@ def create_connection_channel(config):
                 channel.stop_consuming()
                 if payload['success']:
                     response = Response.restore_from_disk(exe)
-                    logger.info(
-                        "response has length %d" % len(response.content))
                 else:
                     logger.warning("response indicated failure")
 
@@ -97,7 +98,6 @@ if __name__ == '__main__':
     import sys
     import json
     from repodono.model.config import Configuration
-    from repodono.model.http import Response
 
     logger = logging.getLogger('repodono')
     handler = logging.StreamHandler()
@@ -127,11 +127,15 @@ if __name__ == '__main__':
             # can't do this
             force_msg = True
         else:
-            print("Cached response has length %d" % len(response.content))
+            logger.info(
+                "cached response has length %d" % len(response.content))
 
     if force_msg:
         connection, channel, sender = create_connection_channel(config)
-        sender(payload, exe)
+        response = sender(payload, exe)
+
+    if response:
+        logger.info("response has length %d" % len(response.content))
 
     print("Total execution time after building exe/payload: %0.3fms" % (
         (time() - start_time) * 1000))

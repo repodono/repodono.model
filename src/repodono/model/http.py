@@ -1,6 +1,8 @@
 import json
 import logging
+from pathlib import Path
 from mimetypes import MimeTypes
+from requests.structures import CaseInsensitiveDict
 
 from repodono.model.base import Execution
 
@@ -63,10 +65,20 @@ class Response(object):
         else:
             vars(self)['content'] = bytes(value, encoding='utf8')
 
+    @property
+    def headers(self):
+        return vars(self)['headers']
+
+    @headers.setter
+    def headers(self, value):
+        vars(self)['headers'] = CaseInsensitiveDict(value)
+
     def store_to_disk(self, execution):
         self.validate_execution_locals(execution)
         checked_write_bytes(execution.locals, '__path__', self.content)
-        headers = bytes(json.dumps(self.headers), encoding='utf8')
+        # TODO figure out how to avoid the dict casting step...
+        # Python stdlib tools are just too misshapen to do anything...
+        headers = bytes(json.dumps(dict(self.headers)), encoding='utf8')
         checked_write_bytes(execution.locals, '__metadata_path__', headers)
 
 

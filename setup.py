@@ -38,6 +38,7 @@ setup(
         'regex',
         'toml',
         'uritemplate',
+        'requests',
     ],
     extras_require={
         'flask': [

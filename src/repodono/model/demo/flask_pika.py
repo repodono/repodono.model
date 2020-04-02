@@ -14,7 +14,11 @@ from flask import (
 )
 
 from repodono.model.urimatch_flask import URITemplateRule
-from repodono.model.exceptions import ExecutionNoResultError
+from repodono.model.exceptions import (
+    ExecutionError,
+    ExecutionTimeoutError,
+    ExecutionNoResultError,
+)
 
 from repodono.model.http import Response
 from repodono.model.demo.pika_sender import create_connection_channel
@@ -34,12 +38,15 @@ def configure_app(app, config):
                 "mapping": kwargs,
                 "bucket_mapping": dict(request.headers),
             })
-            response = sender(payload, execution)
-
-        # TODO sender should disambiguate between timeout or no
-        # response
-        if response is None:
-            abort(404)
+            # XXX figure out how to not nest this try block
+            try:
+                response = sender(payload, execution)
+            except ExecutionNoResultError:
+                abort(404)
+            except ExecutionTimeoutError:
+                abort(504)
+            except ExecutionError:
+                abort(500)
 
         return FlaskResponse(
             response.content, mimetype=response.headers['content-type'])

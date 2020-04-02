@@ -17,13 +17,26 @@ from repodono.model.exceptions import ExecutionNoResultError
 logger = logging.getLogger(__name__)
 
 
-def build_receipt(success=False, path=None):
-    result = {
-        'success': success,
-    }
+def build_receipt(reject=None, result=None, error=None, path=None):
+    receipt = {}
+    if reject is not None:
+        # the rejection reason
+        receipt['processed'] = False
+        receipt['reject'] = reject
+    else:
+        # otherwise the job is processed
+        receipt['processed'] = True
+
+    if error:
+        receipt['error'] = error
+        receipt['result'] = False
+    elif result is not None:
+        receipt['result'] = result
+
     if path:
-        result['path'] = path
-    return json.dumps(result)
+        receipt['path'] = path
+
+    return json.dumps(receipt)
 
 
 def create_connection_channel(config):
@@ -47,7 +60,7 @@ def create_connection_channel(config):
     def reject(delivery_tag, **kw):
         channel.basic_publish(
             exchange=exchange, routing_key=status,
-            body=build_receipt(False, **kw)
+            body=build_receipt(**kw)
         )
         channel.basic_reject(
             delivery_tag=delivery_tag, requeue=False)
@@ -56,7 +69,7 @@ def create_connection_channel(config):
     def ack(delivery_tag, **kw):
         channel.basic_publish(
             exchange=exchange, routing_key=status,
-            body=build_receipt(True, **kw)
+            body=build_receipt(reject=None, result=True, **kw)
         )
         channel.basic_ack(delivery_tag=delivery_tag)
         return True
@@ -68,7 +81,7 @@ def create_connection_channel(config):
             decoded = json.loads(body)
         except ValueError:
             logger.info("received invalid json")
-            return reject(method.delivery_tag)
+            return reject(method.delivery_tag, reject="invalid json message")
 
         try:
             # endpoint, kwargs, headers
@@ -76,6 +89,8 @@ def create_connection_channel(config):
             path = str(execution.locals['__path__'])
         except Exception as e:
             logger.info("failed to request execution")
+            return reject(
+                method.delivery_tag, reject="request_execution failed")
             traceback.print_exc()
             # reject execution failures for now.
             return reject(method.delivery_tag)
@@ -86,12 +101,15 @@ def create_connection_channel(config):
             logger.debug("execution with received json produced no results")
             logger.debug("finished entire task in %0.3fms", (
                 time() - start_time) * 1000)
-            return reject(method.delivery_tag, path=path)
+            return reject(method.delivery_tag, result=False, path=path)
         except Exception as e:
             logger.exception("failed execution")
             # reject execution failures for now; alternatively option is
             # to requeue this somehow?
-            return reject(method.delivery_tag, path=path)
+            # TODO how to communicate the stacktrace without sending the
+            # whole message?
+            return reject(
+                method.delivery_tag, error='execution failure', path=path)
 
         try:
             result.store_to_disk(execution)

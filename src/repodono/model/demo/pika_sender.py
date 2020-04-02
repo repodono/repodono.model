@@ -11,7 +11,14 @@ import pika
 from pathlib import Path
 from time import time
 
+# from repodono.model.exceptions import Error
 from repodono.model.http import Response
+from repodono.model.exceptions import (
+    ExecutionError,
+    ExecutionTimeoutError,
+    ExecutionNoResultError,
+    ExecutionRejectError,
+)
 
 logger = logging.getLogger()
 
@@ -40,7 +47,8 @@ def create_connection_channel(config):
 
     def sender(body, exe):
         # TODO figure out how to gracefully check existance of file.
-
+        # TODO whether or not include a cache handling/timing/expiry
+        # in here somewhere?
         start_time = time()
         response = None
         logger.debug("sending %r" % body)
@@ -50,19 +58,24 @@ def create_connection_channel(config):
         for method, properties, body in channel.consume(
                 queue=q_name, auto_ack=True, inactivity_timeout=timeout):
             if method is None:
-                logger.warning(
+                raise ExecutionTimeoutError(
                     "no response received after %s second(s)" % timeout)
-                # TODO some kind of timeout error
-                break
+
             logger.debug("received: [%r] %r" % (method.routing_key, body,))
             payload = json.loads(body)
-            if payload['path'] == str(exe.locals['__path__']):
+            if payload.get('reject'):
+                raise ExecutionRejectError(
+                    "response was rejection: %s", payload['reject'])
+            elif payload['path'] == str(exe.locals['__path__']):
                 # XXX this duplicates the initial response loading...
                 channel.stop_consuming()
-                if payload['success']:
-                    response = Response.restore_from_disk(exe)
-                else:
-                    logger.warning("response indicated failure")
+                if payload.get('error'):
+                    raise ExecutionError(
+                        "execution error: %s" % payload['error'])
+                elif not payload['result']:
+                    raise ExecutionNoResultError(
+                        "execution produced no result")
+                response = Response.restore_from_disk(exe)
 
         connection.close()
         logger.debug("acquired response after sending in %0.3fms", (
@@ -132,7 +145,11 @@ if __name__ == '__main__':
 
     if force_msg:
         connection, channel, sender = create_connection_channel(config)
-        response = sender(payload, exe)
+        try:
+            response = sender(payload, exe)
+        except ExecutionError as e:
+            logger.warning("an execution error occurred: %s", e)
+            response = None
 
     if response:
         logger.info("response has length %d" % len(response.content))

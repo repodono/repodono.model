@@ -70,13 +70,15 @@ if __name__ == '__main__':
     import sys
     from flask import Flask
     from repodono.model.config import Configuration
+    from repodono.model.http import HttpExecution
 
     if len(sys.argv) < 2:
         sys.stderr.write('usage: %s <config.toml>\n' % sys.argv[0])
         sys.exit(1)
 
     with open(sys.argv[1]) as fd:
-        config = Configuration.from_toml(fd.read())
+        config = Configuration.from_toml(
+            fd.read(), execution_class=HttpExecution)
 
     settings = config.get('settings', {})
     flask_settings = settings.get('flask', {})

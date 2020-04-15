@@ -771,6 +771,79 @@ class ConfigIntegrationTestCase(unittest.TestCase):
         # this would have simply access the value like above also
         self.assertEqual(exe.execute().path, {'key': 'the value'})
 
+    def test_resource_int_argument(self):
+        # Test for non string values
+        config = Configuration.from_toml("""
+        [environment.variables]
+        some_name = "the value"
+
+        [environment.paths]
+        somewhere = "/"
+
+        [bucket._]
+        __roots__ = ['somewhere']
+
+        [[resource."/"]]
+        __name__ = "thing"
+        __init__ = "repodono.model.testing:Thing"
+        path.digit = 1
+        path.truth = true
+
+        [endpoint._."/entry/view"]
+        __provider__ = "thing"
+        """)
+
+        exe = config.request_execution('/entry/view', {})
+        self.assertEqual(exe.locals['thing'].path, {'digit': 1, 'truth': True})
+        # this would have simply access the value like above also
+        self.assertEqual(exe.execute().path, {'digit': 1, 'truth': True})
+
+    def test_resource_literal_eval(self):
+        # Test that arguments for a resource may be a quoted literal
+        # string, which will not be dereferenced.
+        config = Configuration.from_toml("""
+        [environment.variables]
+        some_name = "the value"
+
+        [environment.paths]
+        somewhere = "/"
+
+        [bucket._]
+        __roots__ = ['somewhere']
+
+        [[resource."/"]]
+        __name__ = "thing1"
+        __init__ = "repodono.model.testing:Thing"
+        path = "'literal'"
+
+        [[resource."/"]]
+        __name__ = "thing2"
+        __init__ = "repodono.model.testing:Thing"
+        path.key1 = "some_name"
+        path.key2 = "'literal'"
+        path.key3 = ["'literal1'", "'literal2'"]
+
+        [endpoint._."/entry/view1"]
+        __provider__ = "thing1"
+
+        [endpoint._."/entry/view2"]
+        __provider__ = "thing2"
+        """)
+
+        exe1 = config.request_execution('/entry/view1', {})
+        self.assertEqual(exe1.locals['thing1'].path, 'literal')
+        self.assertEqual(exe1.execute().path, 'literal')
+
+        exe2 = config.request_execution('/entry/view2', {})
+        self.assertEqual(exe2.locals['thing2'].path, {
+            'key1': 'the value', 'key2': 'literal',
+            'key3': ['literal1', 'literal2']
+        })
+        self.assertEqual(exe2.execute().path, {
+            'key1': 'the value', 'key2': 'literal',
+            'key3': ['literal1', 'literal2']
+        })
+
     def test_resource_dot_access_argument(self):
         # Test that dictionary values passed to resource also resolved.
         config = Configuration.from_toml("""
@@ -799,7 +872,6 @@ class ConfigIntegrationTestCase(unittest.TestCase):
 
         exe = config.request_execution('/entry/view', {})
         self.assertEqual(exe.locals['thing'].path, "the value")
-        # this would have simply access the value like above also
         self.assertEqual(exe.execute().path, "the value")
 
     def test_localmap(self):

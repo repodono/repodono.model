@@ -968,6 +968,52 @@ class BaseResourceDefinitionTestCase(unittest.TestCase):
             '__path__': 'modified',
         })().path, 'static')
 
+    def test_various_types(self):
+        # More additional testing is done in test_config for more
+        # varied use cases from simulated toml configurations.
+
+        key_literal = BaseResourceDefinition(
+            name='literal', call=Thing, kwargs={'path': '"literal"'})
+        key_number = BaseResourceDefinition(
+            name='number', call=Thing, kwargs={'path': 1})
+        key_boolean = BaseResourceDefinition(
+            name='boolean', call=Thing, kwargs={'path': True})
+        key_invalid_literal = BaseResourceDefinition(
+            name='invalid_lit', call=Thing, kwargs={'path': '"unterminated'})
+        key_invalid_type = BaseResourceDefinition(
+            name='invalid_type', call=Thing, kwargs={'path': NotImplemented})
+
+        raw_dict = {
+            'literal': 'oops this got resolved?',
+            '"literal"': 'oops this got resolved?',
+            '"unterminated': 'oops this got resolved?',
+            1: 'oops this got resolved?',
+            True: 'oops this got resolved?',
+        }
+
+        literal = key_literal(vars_=raw_dict)
+        self.assertEqual(literal().path, 'literal')
+
+        number = key_number(vars_=raw_dict)
+        self.assertEqual(number().path, 1)
+
+        boolean = key_boolean(vars_=raw_dict)
+        self.assertEqual(boolean().path, True)
+
+        with self.assertRaises(KeyError) as e:
+            key_invalid_literal(vars_=raw_dict)()
+
+        self.assertEqual(
+            e.exception.args[0],
+            "'\"unterminated' is an unsupported literal value")
+
+        with self.assertRaises(KeyError) as e:
+            key_invalid_type(vars_=raw_dict)()
+
+        self.assertEqual(
+            e.exception.args[0],
+            "NotImplemented is of an unsupported type for mapping")
+
 
 class ResourceDefinitionMappingTestCase(unittest.TestCase):
 

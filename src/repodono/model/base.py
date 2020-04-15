@@ -5,6 +5,7 @@ from operator import attrgetter
 from pathlib import Path
 from types import FunctionType
 from types import MappingProxyType
+from ast import literal_eval
 from collections import (
     Sequence,
     Mapping,
@@ -25,6 +26,7 @@ def map_vars_value(value, vars_):
     # these are assumed to be produced by the toml/json loads,
     # which should only produce instances of list/dict for the
     # structured data types.
+    # KeyError being raised because it's considered invalid lookup.
     if isinstance(value, list):
         return [map_vars_value(key, vars_) for key in value]
     elif isinstance(value, dict):
@@ -32,10 +34,19 @@ def map_vars_value(value, vars_):
             name: map_vars_value(key, vars_) for name, key in value.items()}
     elif isinstance(value, attrgetter):
         return value(vars_)
-    elif '.' in value:
-        return attrgetter(value)(vars_)
-    else:
-        return vars_[value]
+    elif isinstance(value, (int, bool)):
+        return value
+    elif isinstance(value, str):
+        if value[:1] in '\'\"':
+            try:
+                return literal_eval(value)
+            except Exception:
+                raise KeyError("%r is an unsupported literal value" % value)
+        elif '.' in value:
+            return attrgetter(value)(vars_)
+        else:
+            return vars_[value]
+    raise KeyError('%r is of an unsupported type for mapping' % value)
 
 
 def structured_mapper(

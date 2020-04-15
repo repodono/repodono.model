@@ -30,6 +30,7 @@ from repodono.model.base import (
     structured_mapper,
     StructuredMapping,
 )
+from repodono.model.exceptions import MappingReferenceError
 from repodono.model.testing import Thing
 from repodono.model.testing import AttrBaseMapping
 
@@ -640,7 +641,7 @@ class ObjectInstantiationMappingTestCase(unittest.TestCase):
         thing0 = object()
         vars_ = {'thing0': thing0}
 
-        with self.assertRaises(KeyError):
+        with self.assertRaises(MappingReferenceError):
             ObjectInstantiationMapping(value, vars_)
 
     def test_instantiation_redefinition_blocked(self):
@@ -972,6 +973,8 @@ class BaseResourceDefinitionTestCase(unittest.TestCase):
         # More additional testing is done in test_config for more
         # varied use cases from simulated toml configurations.
 
+        key_missing = BaseResourceDefinition(
+            name='missing', call=Thing, kwargs={'path': 'missing'})
         key_literal = BaseResourceDefinition(
             name='literal', call=Thing, kwargs={'path': '"literal"'})
         key_number = BaseResourceDefinition(
@@ -1000,14 +1003,21 @@ class BaseResourceDefinitionTestCase(unittest.TestCase):
         boolean = key_boolean(vars_=raw_dict)
         self.assertEqual(boolean().path, True)
 
-        with self.assertRaises(KeyError) as e:
+        with self.assertRaises(MappingReferenceError) as e:
+            key_missing(vars_=raw_dict)()
+
+        self.assertEqual(
+            e.exception.args[0],
+            "reference to 'missing' could not be resolved")
+
+        with self.assertRaises(MappingReferenceError) as e:
             key_invalid_literal(vars_=raw_dict)()
 
         self.assertEqual(
             e.exception.args[0],
             "'\"unterminated' is an unsupported literal value")
 
-        with self.assertRaises(KeyError) as e:
+        with self.assertRaises(MappingReferenceError) as e:
             key_invalid_type(vars_=raw_dict)()
 
         self.assertEqual(

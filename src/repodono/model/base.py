@@ -16,7 +16,10 @@ from collections import (
 from pkg_resources import EntryPoint
 from uritemplate import URITemplate
 
-from repodono.model.exceptions import ExecutionNoResultError
+from repodono.model.exceptions import (
+    ExecutionNoResultError,
+    MappingReferenceError,
+)
 from repodono.model.proxbind import MappingBinderMeta
 
 logger = getLogger(__name__)
@@ -26,7 +29,6 @@ def map_vars_value(value, vars_):
     # these are assumed to be produced by the toml/json loads,
     # which should only produce instances of list/dict for the
     # structured data types.
-    # KeyError being raised because it's considered invalid lookup.
     if isinstance(value, list):
         return [map_vars_value(key, vars_) for key in value]
     elif isinstance(value, dict):
@@ -41,12 +43,19 @@ def map_vars_value(value, vars_):
             try:
                 return literal_eval(value)
             except Exception:
-                raise KeyError("%r is an unsupported literal value" % value)
+                raise MappingReferenceError(
+                    "%r is an unsupported literal value" % value)
         elif '.' in value:
             return attrgetter(value)(vars_)
         else:
-            return vars_[value]
-    raise KeyError('%r is of an unsupported type for mapping' % value)
+            try:
+                return vars_[value]
+            except KeyError:
+                raise MappingReferenceError(
+                    'reference to %r could not be resolved' % value)
+    else:
+        raise MappingReferenceError(
+            '%r is of an unsupported type for mapping' % value)
 
 
 def structured_mapper(

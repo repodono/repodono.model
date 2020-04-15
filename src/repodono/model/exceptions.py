@@ -23,3 +23,9 @@ class ExecutionTimeoutError(ExecutionError):
     This exception may be raised to indicate that an execution has ran
     out of time (or otherwise timed out).
     """
+
+
+class MappingReferenceError(Exception):
+    """
+    Used to indicate a reference error for a given resource.
+    """

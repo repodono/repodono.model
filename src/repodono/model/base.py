@@ -368,7 +368,13 @@ class ReMappingProxy(Mapping):
         return self.__remap
 
     def __getitem__(self, key):
-        return self._map[self._remap[key]]
+        try:
+            return self._map[self._remap[key]]
+        except KeyError:
+            raise MappingReferenceError(
+                'remapping from %r to %r failed as latter not found in map' % (
+                    key, self._remap[key])
+            )
 
     def __iter__(self):
         return iter(k for k, v in self._remap.items())

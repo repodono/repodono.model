@@ -29,3 +29,11 @@ class MappingReferenceError(Exception):
     """
     Used to indicate a reference error for a given resource.
     """
+
+    # XXX this really should be KeyError, but because how the system
+    # currently also leverages this in the mapping, it **can't** be so
+    # as it would then be swallowed.
+    #
+    # The issue is that all the internal base Mapping classes will need
+    # to be revalidated such that this version would correctly cascade
+    # down to where it is needed.

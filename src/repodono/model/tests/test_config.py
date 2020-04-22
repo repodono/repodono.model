@@ -2,7 +2,11 @@ import unittest
 from pathlib import Path, PurePath
 from tempfile import TemporaryDirectory
 
-from repodono.model.exceptions import ExecutionNoResultError
+from repodono.model.exceptions import (
+    ExecutionNoResultError,
+    MappingReferenceError,
+)
+
 from repodono.model.config import Configuration
 
 
@@ -639,9 +643,13 @@ class ConfigIntegrationTestCase(unittest.TestCase):
         """)
 
         exe = config.request_execution('/entry/', {})
-        with self.assertRaises(KeyError) as e:
+        with self.assertRaises(MappingReferenceError) as e:
             exe.locals['a_mock']
-        self.assertEqual(e.exception.args[0], 'no_such_thing')
+        self.assertEqual(
+            e.exception.args[0],
+            "remapping from 'mock_id' to 'no_such_thing' failed as latter not "
+            "found in map"
+        )
 
     def test_resource_missing_kwargs_provided_endpoint(self):
         # Test out the resource definition that did not define a
@@ -922,7 +930,7 @@ class ConfigIntegrationTestCase(unittest.TestCase):
         # check the other thing first, show that this typical creation
         # is not impeded.
         other_exe = config.request_execution('/entry/other', {})
-        with self.assertRaises(KeyError):
+        with self.assertRaises(MappingReferenceError):
             other_exe.locals['a_mock']
 
     def test_execution_locals_shadowing_environment(self):

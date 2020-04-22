@@ -700,7 +700,7 @@ class ReMappingProxyTestCase(unittest.TestCase):
         self.assertEqual(mapping['internal1'], 'value1')
         self.assertEqual(mapping['internal2'], 'value2')
 
-        with self.assertRaises(KeyError):
+        with self.assertRaises(MappingReferenceError):
             mapping['internal3']
 
         self.assertEqual(len(mapping), 3)

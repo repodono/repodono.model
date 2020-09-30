@@ -22,6 +22,8 @@ def configure_app(app, config):
 
         try:
             result = execution()
+        except FileNotFoundError:
+            abort(404)
         except ExecutionNoResultError:
             abort(404)
 

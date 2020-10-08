@@ -102,6 +102,20 @@ Restrictions that are unlikely to be supported in the future:
 Defined constants from configuration bound to execution locals
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+These are generally referenced or resolved from the selected endpoint
+that was resolved by the resolver.
+
 ``__route__``
 
-    The current route.
+    The current route of the endpoint definition for the selected
+    endpoint
+
+``__root__``
+
+    The root on the filesystem defined for the endpoint definition for
+    the selected endpoint
+
+``__path__``
+
+    The path resolved with the root on the filesystem with the root and
+    path defined for the endpoint definition.

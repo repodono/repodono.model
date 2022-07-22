@@ -6,11 +6,11 @@ from pathlib import Path
 from types import FunctionType
 from types import MappingProxyType
 from ast import literal_eval
-from collections import (
+from collections import defaultdict
+from collections.abc import (
     Sequence,
     Mapping,
     MutableMapping,
-    defaultdict,
 )
 
 from pkg_resources import EntryPoint

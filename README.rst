@@ -3,8 +3,8 @@ repodono.model
 
 Foundation to the runtime and execution model for repodono framework.
 
-.. image:: https://travis-ci.org/repodono/repodono.model.svg?branch=master
-    :target: https://travis-ci.org/repodono/repodono.model
+.. image:: https://github.com/repodono/repodono.model/actions/workflows/build.yml/badge.svg?branch=master
+    :target: https://github.com/repodono/repodono.model/actions/workflows/build.yml?query=branch:master
 .. image:: https://ci.appveyor.com/api/projects/status/2tanwnx1vmssb4pb/branch/master?svg=true
     :target: https://ci.appveyor.com/project/metatoaster/repodono-model/branch/master
 .. image:: https://coveralls.io/repos/github/repodono/repodono.model/badge.svg?branch=master

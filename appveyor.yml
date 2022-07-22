@@ -1,7 +1,6 @@
 environment:
   matrix:
     - PYTHON: "C:\\Python36"
-    - PYTHON: "C:\\Python37"
 
 install:
   - "SET PATH=%PYTHON%;%PYTHON%\\Scripts;%PATH%"
